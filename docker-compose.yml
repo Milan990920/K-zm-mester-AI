@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: kozmu
+      POSTGRES_PASSWORD: kozmu
+      POSTGRES_DB: kozmu_mester
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kozmu -d kozmu_mester"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql+psycopg://kozmu_app:change-me-app-role-password@postgres:5432/kozmu_mester
+      MIGRATIONS_DATABASE_URL: postgresql+psycopg://kozmu:kozmu@postgres:5432/kozmu_mester
+      JWT_SECRET_KEY: local-dev-secret-change-me
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.db.seed &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ./backend:/app
+
+volumes:
+  postgres_data:
