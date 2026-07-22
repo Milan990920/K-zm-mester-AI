@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     environment: str = "local"
     debug: bool = False
+    cors_allowed_origins: list[str] = ["http://localhost:3000"]
 
     database_url: str = "postgresql+psycopg://kozmu_app:change-me-app-role-password@localhost:5432/kozmu_mester"
     # Elevated (owner/superuser) connection used only by Alembic — RLS is never
