@@ -48,9 +48,10 @@ def _test_database():
     alembic_cfg.set_main_option("sqlalchemy.url", TEST_ADMIN_DATABASE_URL)
     command.upgrade(alembic_cfg, "head")
 
-    from app.db.seed import seed_roles
+    from app.db.seed import seed_providers, seed_roles
 
     seed_roles()
+    seed_providers()
 
     yield
 
