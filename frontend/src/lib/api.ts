@@ -126,8 +126,26 @@ export async function uploadDocument(
   return response.json() as Promise<DocumentUploadResult>;
 }
 
-export function listInvoices(accessToken: string): Promise<Invoice[]> {
-  return request<Invoice[]>("/api/v1/invoices", {
+export interface InvoiceFilters {
+  utility_type?: string;
+  invoice_type?: string;
+  invoice_number?: string;
+  pod?: string;
+  period_start?: string;
+  period_end?: string;
+}
+
+function buildQueryString(filters: InvoiceFilters): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) params.set(key, value);
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+export function listInvoices(accessToken: string, filters: InvoiceFilters = {}): Promise<Invoice[]> {
+  return request<Invoice[]>(`/api/v1/invoices${buildQueryString(filters)}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 }
@@ -195,8 +213,11 @@ export function fetchDashboardSummary(accessToken: string): Promise<DashboardSum
 export async function exportInvoices(
   accessToken: string,
   format: "csv" | "xlsx",
+  filters: InvoiceFilters = {},
 ): Promise<Blob> {
-  const response = await fetch(`${API_BASE_URL}/api/v1/invoices/export?format=${format}`, {
+  const params = new URLSearchParams(buildQueryString(filters).slice(1));
+  params.set("format", format);
+  const response = await fetch(`${API_BASE_URL}/api/v1/invoices/export?${params.toString()}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 

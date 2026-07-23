@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ApiError,
   Invoice,
+  InvoiceFilters,
   InvoiceSite,
   exportInvoices,
   fetchInvoiceSites,
@@ -13,6 +14,16 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { UTILITY_LABELS } from "@/lib/utility-labels";
+
+const INVOICE_TYPE_LABELS: Record<string, string> = {
+  commercial: "Kereskedelmi",
+  network_usage_fee: "Rendszerhasználati díj",
+  capacity_fee: "Kapacitásdíj",
+  partial: "Részszámla",
+  settlement: "Elszámoló számla",
+  storno: "Sztornó",
+  correction: "Helyesbítő",
+};
 
 function utilityTypeLabel(invoice: Invoice): string {
   const primary = UTILITY_LABELS[invoice.utility_type] ?? invoice.utility_type;
@@ -45,6 +56,7 @@ export default function InvoicesPage() {
   const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
   const [sitesByInvoiceId, setSitesByInvoiceId] = useState<Record<string, InvoiceSite[]>>({});
   const [isSitesLoading, setIsSitesLoading] = useState(false);
+  const [filters, setFilters] = useState<InvoiceFilters>({});
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -54,11 +66,22 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    listInvoices(accessToken)
+    setIsFetching(true);
+    listInvoices(accessToken, filters)
       .then(setInvoices)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ismeretlen hiba történt"))
       .finally(() => setIsFetching(false));
-  }, [accessToken]);
+  }, [accessToken, filters]);
+
+  function updateFilter(patch: Partial<InvoiceFilters>) {
+    setFilters((prev) => {
+      const next = { ...prev, ...patch };
+      for (const key of Object.keys(next) as (keyof InvoiceFilters)[]) {
+        if (!next[key]) delete next[key];
+      }
+      return next;
+    });
+  }
 
   async function toggleSites(invoiceId: string) {
     if (expandedInvoiceId === invoiceId) {
@@ -82,7 +105,7 @@ export default function InvoicesPage() {
     if (!accessToken) return;
     setIsExporting(true);
     try {
-      const blob = await exportInvoices(accessToken, format);
+      const blob = await exportInvoices(accessToken, format, filters);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -134,11 +157,70 @@ export default function InvoicesPage() {
           </div>
         </header>
 
+        <div className="mb-6 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3 lg:grid-cols-6">
+          <select
+            value={filters.utility_type ?? ""}
+            onChange={(e) => updateFilter({ utility_type: e.target.value || undefined })}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          >
+            <option value="">Összes közmű</option>
+            {Object.entries(UTILITY_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filters.invoice_type ?? ""}
+            onChange={(e) => updateFilter({ invoice_type: e.target.value || undefined })}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          >
+            <option value="">Összes számlatípus</option>
+            {Object.entries(INVOICE_TYPE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="Számlaszám"
+            value={filters.invoice_number ?? ""}
+            onChange={(e) => updateFilter({ invoice_number: e.target.value || undefined })}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          />
+          <input
+            type="text"
+            placeholder="POD"
+            value={filters.pod ?? ""}
+            onChange={(e) => updateFilter({ pod: e.target.value || undefined })}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          />
+          <input
+            type="date"
+            aria-label="Időszak kezdete"
+            value={filters.period_start ?? ""}
+            onChange={(e) => updateFilter({ period_start: e.target.value || undefined })}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          />
+          <input
+            type="date"
+            aria-label="Időszak vége"
+            value={filters.period_end ?? ""}
+            onChange={(e) => updateFilter({ period_end: e.target.value || undefined })}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          />
+        </div>
+
         {isFetching && <p className="text-sm text-slate-500">Betöltés...</p>}
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         {!isFetching && !error && invoices.length === 0 && (
-          <p className="text-sm text-slate-400">Még nincs feltöltött számla.</p>
+          <p className="text-sm text-slate-400">
+            {Object.keys(filters).length > 0
+              ? "Nincs a szűrésnek megfelelő számla."
+              : "Még nincs feltöltött számla."}
+          </p>
         )}
 
         {invoices.length > 0 && (
