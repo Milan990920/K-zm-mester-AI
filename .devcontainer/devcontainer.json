@@ -1,0 +1,20 @@
+{
+  "name": "Közmű Mester",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "forwardPorts": [3000, 8000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Közmű Mester — felület",
+      "visibility": "public",
+      "onAutoForward": "openPreview"
+    },
+    "8000": {
+      "label": "Közmű Mester — backend API",
+      "visibility": "public"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh"
+}
