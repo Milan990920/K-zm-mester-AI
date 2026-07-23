@@ -7,10 +7,17 @@ Run with: `python -m app.db.seed`
 
 from sqlalchemy import select
 
+from app.auth.password import hash_password
 from app.db.session import SessionLocal
 from app.models.enums import RoleCode, UtilityType
 from app.models.provider import Provider
 from app.models.role import Role
+from app.models.tenant import Tenant
+from app.models.user import User
+
+DEMO_TENANT_NAME = "Demo Kft."
+DEMO_ADMIN_EMAIL = "demo@kozmumester.hu"
+DEMO_ADMIN_PASSWORD = "Demo1234!"
 
 ROLE_DESCRIPTIONS: dict[RoleCode, str] = {
     RoleCode.SUPER_ADMIN: "Közmű Mester üzemeltető — teljes hozzáférés minden tenanthoz",
@@ -116,7 +123,32 @@ def seed_providers() -> None:
         db.commit()
 
 
+def seed_demo_tenant() -> None:
+    """Creates one login-ready demo tenant so a fresh deployment has
+    somewhere to sign in immediately, before any real customer data exists."""
+    with SessionLocal() as db:
+        if db.scalar(select(User).where(User.email == DEMO_ADMIN_EMAIL)) is not None:
+            return
+        tenant = db.scalar(select(Tenant).where(Tenant.name == DEMO_TENANT_NAME))
+        if tenant is None:
+            tenant = Tenant(name=DEMO_TENANT_NAME)
+            db.add(tenant)
+            db.flush()
+        admin_role_id = db.scalar(select(Role.id).where(Role.code == RoleCode.CUSTOMER_ADMIN.value))
+        db.add(
+            User(
+                tenant_id=tenant.id,
+                role_id=admin_role_id,
+                email=DEMO_ADMIN_EMAIL,
+                hashed_password=hash_password(DEMO_ADMIN_PASSWORD),
+                full_name="Demo Adminisztrátor",
+            )
+        )
+        db.commit()
+
+
 if __name__ == "__main__":
     seed_roles()
     seed_providers()
-    print("Roles and providers seeded.")
+    seed_demo_tenant()
+    print("Roles, providers, and demo tenant seeded.")
