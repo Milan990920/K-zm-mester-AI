@@ -34,9 +34,12 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-["http://localhost:3000"]}
-      # Every invoice upload calls Claude for field extraction (not just
-      # unrecognized providers) — without this, every upload fails identically.
+      # Every invoice upload calls an AI model for field extraction (not
+      # just unrecognized providers) — one of these two must be set, or
+      # every upload fails identically. GOOGLE_API_KEY (a free Gemini key
+      # from aistudio.google.com) is used only if ANTHROPIC_API_KEY is unset.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
     ports:
       - "8000:8000"
     command: >

@@ -7,7 +7,7 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.ai.structuring_client import AnthropicAiStructuringClient
+from app.ai.structuring_client import AiStructuringClient, AnthropicAiStructuringClient, GeminiAiStructuringClient
 from app.api.deps import get_tenant_db
 from app.core.config import get_settings
 from app.models.provider import Provider
@@ -26,11 +26,23 @@ def _select_ocr_engine() -> OcrEngine:
     return TesseractOcrEngine()
 
 
+def _select_ai_client() -> AiStructuringClient:
+    settings = get_settings()
+    if settings.anthropic_api_key:
+        return AnthropicAiStructuringClient()
+    if settings.google_api_key:
+        return GeminiAiStructuringClient()
+    raise RuntimeError(
+        "No AI structuring provider configured — set ANTHROPIC_API_KEY or "
+        "GOOGLE_API_KEY (see docs/README for how to get a free Gemini key)."
+    )
+
+
 def build_pipeline_orchestrator(db: Session) -> PipelineOrchestrator:
     known_providers = list(db.scalars(select(Provider).where(Provider.is_active.is_(True))))
     return PipelineOrchestrator(
         ocr_engine=_select_ocr_engine(),
-        ai_client=AnthropicAiStructuringClient(),
+        ai_client=_select_ai_client(),
         known_providers=known_providers,
     )
 

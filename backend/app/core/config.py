@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     local_storage_dir: str = "./data/documents"
 
     anthropic_api_key: str | None = None
+    # Free-tier fallback for the AI structuring step — used only when
+    # anthropic_api_key is unset (see app/pipeline/dependencies.py).
+    google_api_key: str | None = None
 
     celery_broker_url: str = "redis://localhost:6379/0"
     celery_result_backend: str = "redis://localhost:6379/1"
