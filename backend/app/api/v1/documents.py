@@ -1,8 +1,13 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from pypdf.errors import PdfReadError
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser, get_current_user, get_tenant_db
+from app.models.document import Document
 from app.pipeline.dependencies import get_pipeline_orchestrator
 from app.pipeline.orchestrator import PipelineOrchestrator
 from app.schemas.document import DocumentRead
@@ -54,3 +59,22 @@ async def upload_document(
         ) from exc
 
     return DocumentRead.model_validate(document)
+
+
+@router.get("/{document_id}/download")
+def download_document(
+    document_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_tenant_db),
+    storage: StorageBackend = Depends(get_storage_backend),
+) -> Response:
+    document = db.scalar(select(Document).where(Document.id == document_id))
+    if document is None:
+        raise HTTPException(status_code=404, detail="A dokumentum nem található")
+
+    content = storage.read(document.gcs_path)
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{document.original_filename}"'},
+    )

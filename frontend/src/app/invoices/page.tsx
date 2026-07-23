@@ -240,7 +240,11 @@ export default function InvoicesPage() {
                 {invoices.map((invoice) => (
                   <Fragment key={invoice.id}>
                     <tr className="border-b border-slate-100 last:border-0">
-                      <td className="px-4 py-3">{invoice.invoice_number ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <Link href={`/invoices/${invoice.id}`} className="text-slate-900 hover:underline">
+                          {invoice.invoice_number ?? "—"}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3">{utilityTypeLabel(invoice)}</td>
                       <td className="px-4 py-3">{invoice.invoice_date ?? "—"}</td>
                       <td className="px-4 py-3">

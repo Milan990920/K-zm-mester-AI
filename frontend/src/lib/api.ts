@@ -52,6 +52,43 @@ export interface Invoice {
   processing_status: "queued" | "processing" | "done" | "failed" | "needs_review";
 }
 
+export interface InvoiceLineItem {
+  id: string;
+  line_number: number;
+  description: string;
+  quantity: number | null;
+  unit: string | null;
+  unit_net_price: number | null;
+  net_value: number | null;
+  vat_rate: number | null;
+  vat_value: number | null;
+  gross_value: number | null;
+}
+
+export interface InvoiceDetail extends Invoice {
+  document_id: string;
+  line_items: InvoiceLineItem[];
+}
+
+export function fetchInvoiceDetail(accessToken: string, invoiceId: string): Promise<InvoiceDetail> {
+  return request<InvoiceDetail>(`/api/v1/invoices/${invoiceId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+export async function fetchDocumentPdf(accessToken: string, documentId: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/documents/${documentId}/download`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(body?.detail ?? "A PDF letöltése sikertelen volt", response.status);
+  }
+
+  return response.blob();
+}
+
 export interface MonthlyCost {
   month: string;
   gross_amount_sum: number;

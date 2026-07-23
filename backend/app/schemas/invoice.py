@@ -37,6 +37,26 @@ class InvoiceRead(BaseModel):
     processing_status: ProcessingStatus
 
 
+class InvoiceLineItemRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    line_number: int
+    description: str
+    quantity: float | None
+    unit: str | None
+    unit_net_price: float | None
+    net_value: float | None
+    vat_rate: float | None
+    vat_value: float | None
+    gross_value: float | None
+
+
+class InvoiceDetailRead(InvoiceRead):
+    document_id: uuid.UUID
+    line_items: list[InvoiceLineItemRead]
+
+
 class InvoiceSiteRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
