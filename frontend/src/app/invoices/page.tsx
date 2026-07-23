@@ -1,11 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ApiError, Invoice, exportInvoices, listInvoices } from "@/lib/api";
+import {
+  ApiError,
+  Invoice,
+  InvoiceSite,
+  exportInvoices,
+  fetchInvoiceSites,
+  listInvoices,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { UTILITY_LABELS } from "@/lib/utility-labels";
+
+function utilityTypeLabel(invoice: Invoice): string {
+  const primary = UTILITY_LABELS[invoice.utility_type] ?? invoice.utility_type;
+  if (invoice.secondary_utility_types.length === 0) return primary;
+  const secondary = invoice.secondary_utility_types
+    .map((type) => UTILITY_LABELS[type] ?? type)
+    .join(", ");
+  return `${primary} + ${secondary}`;
+}
 
 const VALIDATION_LABELS: Record<Invoice["validation_status"], string> = {
   pending: "Feldolgozás alatt",
@@ -26,6 +42,9 @@ export default function InvoicesPage() {
   const [error, setError] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
+  const [sitesByInvoiceId, setSitesByInvoiceId] = useState<Record<string, InvoiceSite[]>>({});
+  const [isSitesLoading, setIsSitesLoading] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -40,6 +59,24 @@ export default function InvoicesPage() {
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ismeretlen hiba történt"))
       .finally(() => setIsFetching(false));
   }, [accessToken]);
+
+  async function toggleSites(invoiceId: string) {
+    if (expandedInvoiceId === invoiceId) {
+      setExpandedInvoiceId(null);
+      return;
+    }
+    setExpandedInvoiceId(invoiceId);
+    if (!accessToken || sitesByInvoiceId[invoiceId]) return;
+    setIsSitesLoading(true);
+    try {
+      const sites = await fetchInvoiceSites(accessToken, invoiceId);
+      setSitesByInvoiceId((prev) => ({ ...prev, [invoiceId]: sites }));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "A telephely-bontás lekérése sikertelen volt");
+    } finally {
+      setIsSitesLoading(false);
+    }
+  }
 
   async function handleExport(format: "csv" | "xlsx") {
     if (!accessToken) return;
@@ -114,19 +151,71 @@ export default function InvoicesPage() {
                   <th className="px-4 py-3">Kelte</th>
                   <th className="px-4 py-3">Bruttó összeg</th>
                   <th className="px-4 py-3">Állapot</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
                 {invoices.map((invoice) => (
-                  <tr key={invoice.id} className="border-b border-slate-100 last:border-0">
-                    <td className="px-4 py-3">{invoice.invoice_number ?? "—"}</td>
-                    <td className="px-4 py-3">{UTILITY_LABELS[invoice.utility_type] ?? invoice.utility_type}</td>
-                    <td className="px-4 py-3">{invoice.invoice_date ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      {formatAmount(invoice.gross_amount, invoice.currency)}
-                    </td>
-                    <td className="px-4 py-3">{VALIDATION_LABELS[invoice.validation_status]}</td>
-                  </tr>
+                  <Fragment key={invoice.id}>
+                    <tr className="border-b border-slate-100 last:border-0">
+                      <td className="px-4 py-3">{invoice.invoice_number ?? "—"}</td>
+                      <td className="px-4 py-3">{utilityTypeLabel(invoice)}</td>
+                      <td className="px-4 py-3">{invoice.invoice_date ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        {formatAmount(invoice.gross_amount, invoice.currency)}
+                      </td>
+                      <td className="px-4 py-3">{VALIDATION_LABELS[invoice.validation_status]}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => toggleSites(invoice.id)}
+                          className="text-xs text-slate-500 hover:underline"
+                        >
+                          {expandedInvoiceId === invoice.id ? "Telephelyek elrejtése" : "Telephelyek"}
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedInvoiceId === invoice.id && (
+                      <tr className="border-b border-slate-100 bg-slate-50">
+                        <td colSpan={6} className="px-4 py-3">
+                          {isSitesLoading && !sitesByInvoiceId[invoice.id] && (
+                            <p className="text-xs text-slate-400">Betöltés...</p>
+                          )}
+                          {sitesByInvoiceId[invoice.id]?.length === 0 && (
+                            <p className="text-xs text-slate-400">
+                              Ehhez a számlához nincs telephely-szintű bontás — egyetlen fogyasztási helyre
+                              vonatkozik.
+                            </p>
+                          )}
+                          {sitesByInvoiceId[invoice.id] && sitesByInvoiceId[invoice.id].length > 0 && (
+                            <table className="w-full text-xs">
+                              <thead className="text-slate-500">
+                                <tr>
+                                  <th className="px-2 py-1 text-left">Telephely</th>
+                                  <th className="px-2 py-1 text-left">Azonosító</th>
+                                  <th className="px-2 py-1 text-right">Fogyasztás</th>
+                                  <th className="px-2 py-1 text-right">Bruttó összeg</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sitesByInvoiceId[invoice.id].map((site) => (
+                                  <tr key={site.id} className="border-t border-slate-200">
+                                    <td className="px-2 py-1">{site.site_address}</td>
+                                    <td className="px-2 py-1">{site.site_identifier ?? "—"}</td>
+                                    <td className="px-2 py-1 text-right">
+                                      {site.consumption_value ?? "—"} {site.consumption_unit ?? ""}
+                                    </td>
+                                    <td className="px-2 py-1 text-right">
+                                      {formatAmount(site.gross_amount, invoice.currency)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

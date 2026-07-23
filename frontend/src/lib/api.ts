@@ -34,6 +34,7 @@ export interface Invoice {
   provider_id: string | null;
   consumption_point_id: string | null;
   utility_type: string;
+  secondary_utility_types: string[];
   invoice_type: string;
   delivery_format: string;
   invoice_number: string | null;
@@ -127,6 +128,22 @@ export async function uploadDocument(
 
 export function listInvoices(accessToken: string): Promise<Invoice[]> {
   return request<Invoice[]>("/api/v1/invoices", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+export interface InvoiceSite {
+  id: string;
+  site_address: string;
+  site_identifier: string | null;
+  meter_serial_number: string | null;
+  consumption_value: number | null;
+  consumption_unit: string | null;
+  gross_amount: number | null;
+}
+
+export function fetchInvoiceSites(accessToken: string, invoiceId: string): Promise<InvoiceSite[]> {
+  return request<InvoiceSite[]>(`/api/v1/invoices/${invoiceId}/sites`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 }
