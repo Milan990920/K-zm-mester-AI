@@ -148,6 +148,44 @@ export function fetchInvoiceSites(accessToken: string, invoiceId: string): Promi
   });
 }
 
+export interface ManagedUser {
+  id: string;
+  tenant_id: string | null;
+  email: string;
+  full_name: string;
+  is_active: boolean;
+  role: "customer_admin" | "customer_user";
+}
+
+export function listUsers(accessToken: string): Promise<ManagedUser[]> {
+  return request<ManagedUser[]>("/api/v1/users", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+export function createUser(
+  accessToken: string,
+  payload: { email: string; full_name: string; password: string; role: "customer_admin" | "customer_user" },
+): Promise<ManagedUser> {
+  return request<ManagedUser>("/api/v1/users", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function setUserActive(
+  accessToken: string,
+  userId: string,
+  isActive: boolean,
+): Promise<ManagedUser> {
+  return request<ManagedUser>(`/api/v1/users/${userId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ is_active: isActive }),
+  });
+}
+
 export function fetchDashboardSummary(accessToken: string): Promise<DashboardSummary> {
   return request<DashboardSummary>("/api/v1/dashboard/summary", {
     headers: { Authorization: `Bearer ${accessToken}` },

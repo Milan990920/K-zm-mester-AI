@@ -107,6 +107,14 @@ export default function DashboardPage() {
             >
               Számlák
             </Link>
+            {user.role === "customer_admin" && (
+              <Link
+                href="/users"
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                Felhasználók
+              </Link>
+            )}
             <button
               onClick={logout}
               className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
