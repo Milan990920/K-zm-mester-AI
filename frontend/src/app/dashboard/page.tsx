@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 
@@ -40,20 +41,32 @@ export default function DashboardPage() {
               Bejelentkezve mint {ROLE_LABELS[user.role] ?? user.role}
             </p>
           </div>
-          <button
-            onClick={logout}
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-          >
-            Kijelentkezés
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/upload"
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              Számla feltöltése
+            </Link>
+            <Link
+              href="/invoices"
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Számlák
+            </Link>
+            <button
+              onClick={logout}
+              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Kijelentkezés
+            </button>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DashboardCard title="Havi fogyasztás" placeholder="Grafikon hamarosan" />
           <DashboardCard title="Havi költség" placeholder="Grafikon hamarosan" />
           <DashboardCard title="Éves költség" placeholder="Grafikon hamarosan" />
-          <DashboardCard title="Legutóbb feltöltött számlák" placeholder="Még nincs feltöltött számla" />
-          <DashboardCard title="Feldolgozásra váró számlák" placeholder="Nincs feldolgozásra váró számla" />
           <DashboardCard title="AI asszisztens" placeholder="Hamarosan elérhető" />
         </div>
       </div>

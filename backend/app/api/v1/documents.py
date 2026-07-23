@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from pypdf.errors import PdfReadError
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser, get_current_user, get_tenant_db
@@ -35,13 +36,21 @@ async def upload_document(
             detail="A fájl mérete meghaladja a megengedett 20 MB-ot",
         )
 
-    document = process_uploaded_document(
-        db=db,
-        storage=storage,
-        orchestrator=orchestrator,
-        tenant_id=current_user.tenant_id,
-        uploaded_by_user_id=current_user.id,
-        original_filename=file.filename or "dokumentum.pdf",
-        content=content,
-    )
+    try:
+        document = process_uploaded_document(
+            db=db,
+            storage=storage,
+            orchestrator=orchestrator,
+            tenant_id=current_user.tenant_id,
+            uploaded_by_user_id=current_user.id,
+            original_filename=file.filename or "dokumentum.pdf",
+            content=content,
+        )
+    except PdfReadError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A feltöltött fájl nem érvényes vagy sérült PDF",
+        ) from exc
+
     return DocumentRead.model_validate(document)

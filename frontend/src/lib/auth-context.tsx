@@ -8,6 +8,7 @@ const ACCESS_TOKEN_KEY = "kozmu_mester_access_token";
 interface AuthContextValue {
   user: CurrentUser | null;
   isLoading: boolean;
+  accessToken: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -26,7 +28,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     fetchCurrentUser(storedToken)
-      .then(setUser)
+      .then((currentUser) => {
+        setUser(currentUser);
+        setAccessToken(storedToken);
+      })
       .catch(() => window.localStorage.removeItem(ACCESS_TOKEN_KEY))
       .finally(() => setIsLoading(false));
   }, []);
@@ -36,15 +41,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
     const currentUser = await fetchCurrentUser(tokens.access_token);
     setUser(currentUser);
+    setAccessToken(tokens.access_token);
   }, []);
 
   const logout = useCallback(() => {
     window.localStorage.removeItem(ACCESS_TOKEN_KEY);
     setUser(null);
+    setAccessToken(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, accessToken, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

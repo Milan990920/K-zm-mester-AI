@@ -159,6 +159,25 @@ def test_upload_rejects_non_pdf_content_type(client, make_tenant, make_user, tmp
     client.app.dependency_overrides.clear()
 
 
+def test_upload_rejects_corrupt_pdf_with_clean_error(client, make_tenant, make_user, tmp_path):
+    tenant = make_tenant()
+    make_user(tenant.id, "customer_admin", email="upload4@teszt.hu", password="Titok1234!")
+    token = _login(client, "upload4@teszt.hu", "Titok1234!")
+
+    _override_pipeline_and_storage(client.app, tmp_path, _FakeAiClient(_valid_invoice()))
+
+    response = client.post(
+        "/api/v1/documents",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("corrupt.pdf", b"not actually a pdf", "application/pdf")},
+    )
+
+    assert response.status_code == 422
+    assert "PDF" in response.json()["detail"]
+
+    client.app.dependency_overrides.clear()
+
+
 def test_list_invoices_only_returns_own_tenant(client, make_tenant, make_user, tmp_path):
     tenant_a = make_tenant(name="Lista A Kft.")
     tenant_b = make_tenant(name="Lista B Kft.")
