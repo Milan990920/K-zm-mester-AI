@@ -22,6 +22,8 @@ class Settings(BaseSettings):
 
     gcs_bucket_name: str = "kozmu-mester-documents"
     google_application_credentials: str | None = None
+    # Used only when google_application_credentials is unset (local/self-hosted dev).
+    local_storage_dir: str = "./data/documents"
 
     anthropic_api_key: str | None = None
 

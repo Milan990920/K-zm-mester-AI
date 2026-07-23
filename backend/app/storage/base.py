@@ -1,0 +1,9 @@
+from typing import Protocol
+
+
+class StorageBackend(Protocol):
+    def save(self, path: str, content: bytes) -> None: ...
+
+    def read(self, path: str) -> bytes: ...
+
+    def exists(self, path: str) -> bool: ...

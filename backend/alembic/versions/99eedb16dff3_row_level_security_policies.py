@@ -36,9 +36,16 @@ TENANT_SCOPED_TABLES = [
 # opens a tenant_scoped_session (see app/db/session.py) which sets the
 # tenant context, and RLS then acts as a second line of defense against an
 # application bug that forgets a `WHERE tenant_id = ...` filter.
+#
+# NULLIF(..., '') matters here: a *never-touched* custom GUC reads back as
+# NULL, but once a connection has done even one `SET LOCAL`/`set_config`
+# on it, PostgreSQL reverts it to '' (empty string), not NULL, once that
+# transaction ends — and connections are pooled/reused across requests, so
+# every connection that ever served a tenant-scoped request would otherwise
+# permanently fail this check with `invalid input syntax for type uuid`.
 POLICY_USING_CLAUSE = (
-    "tenant_id = current_setting('app.current_tenant_id', true)::uuid "
-    "OR current_setting('app.current_tenant_id', true) IS NULL"
+    "tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')::uuid "
+    "OR NULLIF(current_setting('app.current_tenant_id', true), '') IS NULL"
 )
 
 

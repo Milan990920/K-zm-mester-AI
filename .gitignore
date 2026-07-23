@@ -33,3 +33,6 @@ frontend/.env*.local
 
 # Alembic local
 backend/alembic/versions/__pycache__/
+
+# Local document storage (dev fallback for GCS)
+backend/data/

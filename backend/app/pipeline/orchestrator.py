@@ -36,6 +36,11 @@ class PipelineResult:
     validation_findings: list[ValidationFinding]
     processing_status: ProcessingStatus
     attempts_used: int
+    is_digital: bool
+    page_count: int
+    document_text: str
+    document_text_engine: str
+    matched_provider: Provider | None = None
     stage_runs: list[StageRun] = field(default_factory=list)
 
 
@@ -58,12 +63,14 @@ class PipelineOrchestrator:
         text_result = extract_text_layer(pdf_bytes)
         if text_result.is_digital:
             text = text_result.extracted_text
+            text_engine = "native_text"
             stage_runs.append(
                 StageRun(PipelineStage.TEXT_EXTRACTION, RunStatus.SUCCESS, attempt_number=1)
             )
         else:
             ocr_result = self._ocr_engine.extract_text(pdf_bytes)
             text = ocr_result.text
+            text_engine = ocr_result.engine_name
             stage_runs.append(
                 StageRun(
                     PipelineStage.OCR, RunStatus.SUCCESS, attempt_number=1, detail=ocr_result.engine_name
@@ -100,6 +107,11 @@ class PipelineOrchestrator:
             provider_hint=provider_match.provider.name if provider_match else None,
             invoice_type_hints=[hint.value for hint in invoice_type_hints],
             stage_runs=stage_runs,
+            is_digital=text_result.is_digital,
+            page_count=text_result.page_count,
+            document_text=text,
+            document_text_engine=text_engine,
+            matched_provider=provider_match.provider if provider_match else None,
         )
 
     def _structure_and_validate_with_retries(
@@ -108,6 +120,11 @@ class PipelineOrchestrator:
         provider_hint: str | None,
         invoice_type_hints: list[str],
         stage_runs: list[StageRun],
+        is_digital: bool,
+        page_count: int,
+        document_text: str,
+        document_text_engine: str,
+        matched_provider: Provider | None,
     ) -> PipelineResult:
         last_findings: list[ValidationFinding] = []
         last_data: ExtractedInvoiceData | None = None
@@ -144,6 +161,11 @@ class PipelineOrchestrator:
                     validation_findings=findings,
                     processing_status=ProcessingStatus.DONE,
                     attempts_used=attempt,
+                    is_digital=is_digital,
+                    page_count=page_count,
+                    document_text=document_text,
+                    document_text_engine=document_text_engine,
+                    matched_provider=matched_provider,
                     stage_runs=stage_runs,
                 )
 
@@ -155,5 +177,10 @@ class PipelineOrchestrator:
             validation_findings=last_findings,
             processing_status=ProcessingStatus.NEEDS_REVIEW,
             attempts_used=self._max_attempts,
+            is_digital=is_digital,
+            page_count=page_count,
+            document_text=document_text,
+            document_text_engine=document_text_engine,
+            matched_provider=matched_provider,
             stage_runs=stage_runs,
         )

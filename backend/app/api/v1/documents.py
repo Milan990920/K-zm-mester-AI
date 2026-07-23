@@ -1,0 +1,47 @@
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
+
+from app.api.deps import CurrentUser, get_current_user, get_tenant_db
+from app.pipeline.dependencies import get_pipeline_orchestrator
+from app.pipeline.orchestrator import PipelineOrchestrator
+from app.schemas.document import DocumentRead
+from app.services.document_processing import process_uploaded_document
+from app.storage.base import StorageBackend
+from app.storage.factory import get_storage_backend
+
+router = APIRouter(prefix="/documents", tags=["documents"])
+
+MAX_UPLOAD_SIZE_BYTES = 20 * 1024 * 1024
+
+
+@router.post("", response_model=DocumentRead, status_code=status.HTTP_201_CREATED)
+async def upload_document(
+    file: UploadFile,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_tenant_db),
+    orchestrator: PipelineOrchestrator = Depends(get_pipeline_orchestrator),
+    storage: StorageBackend = Depends(get_storage_backend),
+) -> DocumentRead:
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Csak PDF fájl tölthető fel",
+        )
+
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="A fájl mérete meghaladja a megengedett 20 MB-ot",
+        )
+
+    document = process_uploaded_document(
+        db=db,
+        storage=storage,
+        orchestrator=orchestrator,
+        tenant_id=current_user.tenant_id,
+        uploaded_by_user_id=current_user.id,
+        original_filename=file.filename or "dokumentum.pdf",
+        content=content,
+    )
+    return DocumentRead.model_validate(document)
