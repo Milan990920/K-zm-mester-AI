@@ -51,6 +51,26 @@ export interface Invoice {
   processing_status: "queued" | "processing" | "done" | "failed" | "needs_review";
 }
 
+export interface MonthlyCost {
+  month: string;
+  gross_amount_sum: number;
+  currency: string;
+}
+
+export interface MonthlyConsumption {
+  month: string;
+  utility_type: string;
+  consumption_unit: string | null;
+  consumption_sum: number;
+}
+
+export interface DashboardSummary {
+  monthly_costs: MonthlyCost[];
+  monthly_consumption: MonthlyConsumption[];
+  yearly_total_cost: number;
+  yearly_total_cost_currency: string;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -107,6 +127,12 @@ export async function uploadDocument(
 
 export function listInvoices(accessToken: string): Promise<Invoice[]> {
   return request<Invoice[]>("/api/v1/invoices", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+}
+
+export function fetchDashboardSummary(accessToken: string): Promise<DashboardSummary> {
+  return request<DashboardSummary>("/api/v1/dashboard/summary", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 }

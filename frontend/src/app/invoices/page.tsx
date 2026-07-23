@@ -5,15 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ApiError, Invoice, listInvoices } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-
-const UTILITY_LABELS: Record<string, string> = {
-  electricity: "Villamos energia",
-  gas: "Földgáz",
-  water: "Víz",
-  sewage: "Csatorna",
-  district_heating: "Távhő",
-  waste: "Hulladékgazdálkodás",
-};
+import { UTILITY_LABELS } from "@/lib/utility-labels";
 
 const VALIDATION_LABELS: Record<Invoice["validation_status"], string> = {
   pending: "Feldolgozás alatt",
