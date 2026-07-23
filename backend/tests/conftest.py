@@ -21,11 +21,11 @@ import uuid  # noqa: E402
 
 import psycopg  # noqa: E402
 import pytest  # noqa: E402
-from alembic.config import Config  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 from alembic import command  # noqa: E402
+from alembic.config import Config  # noqa: E402
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 

@@ -64,7 +64,9 @@ def test_seeded_providers_are_recognized_from_real_invoice_text(db_session):
         "Szombathelyi Távhőszolgáltató Kft.": "Szombathelyi Távhőszolgáltató Kft. 9700 Szombathely",
         "MVM Next Energiakereskedelmi Zrt.": "MVM Next Energiakereskedelmi Zrt. Adószám: 26713111-2-44",
         "EMoGÁ Észak-Magyarországi Gáz Kereskedelmi Kft.": "EMoGÁ Észak-Magyarországi Gáz Kereskedelmi Kft.",
-        "E.ON Észak-Dunántúli Áramhálózati Zrt.": "E.ON Észak-Dunántúli Áramhálózati Zártkörűen Működő Részvénytársaság",
+        "E.ON Észak-Dunántúli Áramhálózati Zrt.": (
+            "E.ON Észak-Dunántúli Áramhálózati Zártkörűen Működő Részvénytársaság"
+        ),
     }
     for expected_name, text in samples.items():
         match = classify_provider_by_text(text, providers)
