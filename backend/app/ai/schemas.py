@@ -29,8 +29,24 @@ class ExtractedMeterReading(BaseModel):
     value: float
 
 
+class ExtractedInvoiceSite(BaseModel):
+    """One consumption site on a consolidated ("gyűjtő") invoice that bills
+    several locations at once — see docs/02-adatbazis-terv.md follow-up on
+    the multi-site invoice limitation."""
+
+    site_address: str
+    site_identifier: str | None = None
+    meter_serial_number: str | None = None
+    consumption_value: float | None = None
+    consumption_unit: str | None = None
+    gross_amount: float | None = None
+
+
 class ExtractedInvoiceData(BaseModel):
     utility_type: UtilityType
+    # Utilities billed on the same invoice in addition to `utility_type`
+    # (e.g. a water bill that also carries the sewage fee).
+    secondary_utility_types: list[UtilityType] = Field(default_factory=list)
     invoice_type: InvoiceType
     delivery_format: DeliveryFormat
 
@@ -67,6 +83,7 @@ class ExtractedInvoiceData(BaseModel):
 
     line_items: list[ExtractedLineItem] = Field(default_factory=list)
     meter_readings: list[ExtractedMeterReading] = Field(default_factory=list)
+    sites: list[ExtractedInvoiceSite] = Field(default_factory=list)
 
     # Per-field self-assessed confidence in [0, 1], keyed by field name.
     # Missing fields are treated as full confidence (nothing to doubt).

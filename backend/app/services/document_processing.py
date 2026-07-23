@@ -14,6 +14,7 @@ from app.models.document import Document
 from app.models.enums import DocumentStatus, PipelineStage, RunStatus, ValidationStatus
 from app.models.invoice import Invoice
 from app.models.invoice_line_item import InvoiceLineItem
+from app.models.invoice_site import InvoiceSite
 from app.models.processing_run import ProcessingRun
 from app.models.validation_issue import ValidationIssue
 from app.pipeline.orchestrator import PipelineOrchestrator
@@ -115,6 +116,7 @@ def process_uploaded_document(
             provider_id=result.matched_provider.id if result.matched_provider else None,
             consumption_point_id=consumption_point.id if consumption_point else None,
             utility_type=data.utility_type,
+            secondary_utility_types=data.secondary_utility_types,
             invoice_type=data.invoice_type,
             delivery_format=data.delivery_format,
             invoice_number=data.invoice_number,
@@ -174,6 +176,20 @@ def process_uploaded_document(
         for finding in result.validation_findings:
             db.add(
                 _validation_issue_from_finding(tenant_id, invoice.id, last_validation_run.id, finding)
+            )
+
+        for site in data.sites:
+            db.add(
+                InvoiceSite(
+                    tenant_id=tenant_id,
+                    invoice_id=invoice.id,
+                    site_address=site.site_address,
+                    site_identifier=site.site_identifier,
+                    meter_serial_number=site.meter_serial_number,
+                    consumption_value=site.consumption_value,
+                    consumption_unit=site.consumption_unit,
+                    gross_amount=site.gross_amount,
+                )
             )
 
     db.commit()

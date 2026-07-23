@@ -19,6 +19,7 @@ class InvoiceRead(BaseModel):
     provider_id: uuid.UUID | None
     consumption_point_id: uuid.UUID | None
     utility_type: UtilityType
+    secondary_utility_types: list[UtilityType]
     invoice_type: InvoiceType
     delivery_format: DeliveryFormat
     invoice_number: str | None
@@ -34,3 +35,15 @@ class InvoiceRead(BaseModel):
     currency: str
     validation_status: ValidationStatus
     processing_status: ProcessingStatus
+
+
+class InvoiceSiteRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    site_address: str
+    site_identifier: str | None
+    meter_serial_number: str | None
+    consumption_value: float | None
+    consumption_unit: str | None
+    gross_amount: float | None

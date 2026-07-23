@@ -3,6 +3,7 @@ from app.models.consumption_point import ConsumptionPoint
 from app.models.document import Document
 from app.models.invoice import Invoice
 from app.models.invoice_line_item import InvoiceLineItem
+from app.models.invoice_site import InvoiceSite
 from app.models.meter import Meter
 from app.models.meter_reading import MeterReading
 from app.models.partner import Partner
@@ -19,6 +20,7 @@ __all__ = [
     "Document",
     "Invoice",
     "InvoiceLineItem",
+    "InvoiceSite",
     "Meter",
     "MeterReading",
     "Partner",

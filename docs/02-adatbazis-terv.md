@@ -170,6 +170,7 @@ Unique index: `(tenant_id, content_hash)` — ugyanaz a PDF kétszer nem dolgoz�
 | provider_id | UUID FK → providers.id NULL | |
 | consumption_point_id | UUID FK → consumption_points.id NULL | |
 | utility_type | ENUM | villany/gáz/víz/csatorna/távhő/hulladék |
+| secondary_utility_types | ENUM[] DEFAULT '{}' | ha a számla emellett más közmű-típust is fedez (pl. víz + csatorna egy TRV-számlán) |
 | invoice_type | ENUM(commercial, network_usage_fee, capacity_fee, partial, settlement, storno, correction) | |
 | delivery_format | ENUM(electronic, scanned_paper) | |
 | invoice_number | VARCHAR(128) | |
@@ -207,6 +208,10 @@ Unique index: `(tenant_id, content_hash)` — ugyanaz a PDF kétszer nem dolgoz�
 
 Indexek: `(tenant_id, invoice_number)`, `(tenant_id, provider_id)`, `(tenant_id, pod)`,
 `(tenant_id, billing_period_start, billing_period_end)`, `(tenant_id, utility_type, invoice_type)`.
+
+`consumption_point_id` a **egy telephelyes** eset mezője. Több telephelyes ("gyűjtő")
+számláknál (lásd 3.15 `invoice_sites`) ez a mező üresen marad, a telephely-szintű bontást
+a külön táblázat hordozza.
 
 ### 3.10 `invoice_line_items` (számlatételek)
 
@@ -294,6 +299,29 @@ Ez a tábla adja a "miért lett ez az eredmény" kérdésre a választ — kriti
 | metadata | JSONB NULL | |
 | ip_address | INET NULL | |
 | created_at | | |
+
+### 3.15 `invoice_sites` (több telephelyes gyűjtőszámla bontása)
+
+Valós számlákon (pl. egy áramszámla, ami 30 különböző telephelyet fedez egy
+kereskedelmi szerződés alatt) kiderült, hogy egyetlen `consumption_point_id`
+nem elég egy számlához — ez a tábla telephelyenként egy sort tárol, a számla
+fejléce (`invoices`) pedig csak az összesített értékeket hordozza.
+
+| Mező | Típus | Megjegyzés |
+|---|---|---|
+| id | UUID PK | |
+| tenant_id | UUID FK | |
+| invoice_id | UUID FK → invoices.id | |
+| consumption_point_id | UUID FK → consumption_points.id NULL | ha már van hozzá rögzített fogyasztási hely |
+| site_address | VARCHAR(500) | a telephely címe a számlán |
+| site_identifier | VARCHAR(64) NULL | "Fogy. hely azonosítója" |
+| meter_serial_number | VARCHAR(128) NULL | |
+| consumption_value | NUMERIC(14,4) NULL | |
+| consumption_unit | VARCHAR(16) NULL | |
+| gross_amount | NUMERIC(14,2) NULL | a telephelyre eső bruttó rész |
+| created_at / updated_at | | |
+
+Index: `(tenant_id, invoice_id)`. Tenant-szűrt tábla, saját RLS policy-val.
 
 ## 4. Enum lista összefoglaló
 

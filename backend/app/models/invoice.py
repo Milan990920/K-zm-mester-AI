@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import CHAR, Date, Enum, ForeignKey, Index, Numeric, String
+from sqlalchemy import ARRAY, CHAR, Date, Enum, ForeignKey, Index, Numeric, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -41,6 +41,13 @@ class Invoice(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     )
 
     utility_type: Mapped[UtilityType] = mapped_column(Enum(UtilityType, name="utility_type"), nullable=False)
+    # Some invoices legitimately bill more than one utility together (e.g. a
+    # TRV water bill also carries the sewage fee) — `utility_type` stays the
+    # primary/first one for existing filtering & dashboards, and any others
+    # go here so the data isn't silently dropped.
+    secondary_utility_types: Mapped[list[UtilityType]] = mapped_column(
+        ARRAY(Enum(UtilityType, name="utility_type")), nullable=False, default=list
+    )
     invoice_type: Mapped[InvoiceType] = mapped_column(Enum(InvoiceType, name="invoice_type"), nullable=False)
     delivery_format: Mapped[DeliveryFormat] = mapped_column(
         Enum(DeliveryFormat, name="delivery_format"), nullable=False
