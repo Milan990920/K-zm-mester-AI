@@ -77,6 +77,16 @@ KNOWN_PROVIDERS: list[dict] = [
             "tax_numbers": ["10741980-2-08"],
         },
     },
+    {
+        "name": "E2 Hungary Zrt.",
+        "tax_number": "25343502-2-44",
+        "utility_types": [UtilityType.GAS],
+        "parser_key": "generic",
+        "detection_patterns": {
+            "aliases": ["E2 Hungary", "e2hungary.hu"],
+            "tax_numbers": ["25343502-2-44"],
+        },
+    },
 ]
 
 
