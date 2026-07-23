@@ -136,3 +136,19 @@ export function fetchDashboardSummary(accessToken: string): Promise<DashboardSum
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 }
+
+export async function exportInvoices(
+  accessToken: string,
+  format: "csv" | "xlsx",
+): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/invoices/export?format=${format}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(body?.detail ?? "Az exportálás sikertelen volt", response.status);
+  }
+
+  return response.blob();
+}

@@ -1,16 +1,23 @@
 import uuid
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.api.deps import CurrentUser, get_current_user, get_tenant_db
 from app.models.enums import InvoiceType, UtilityType
-from app.models.invoice import Invoice
+from app.reports.invoice_export import invoices_to_csv, invoices_to_xlsx
 from app.schemas.invoice import InvoiceRead
+from app.services.invoice_query import fetch_invoices
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
+
+_EXPORT_CONTENT_TYPES = {
+    "csv": "text/csv",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
 
 
 @router.get("", response_model=list[InvoiceRead])
@@ -25,28 +32,49 @@ def list_invoices(
     current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_tenant_db),
 ) -> list[InvoiceRead]:
-    # RLS (see docs/02-adatbazis-terv.md §5) is the second line of defense —
-    # the explicit tenant_id filter here is the primary one.
-    query = select(Invoice).where(
-        Invoice.tenant_id == current_user.tenant_id, Invoice.deleted_at.is_(None)
+    invoices = fetch_invoices(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        provider_id=provider_id,
+        utility_type=utility_type,
+        invoice_type=invoice_type,
+        pod=pod,
+        invoice_number=invoice_number,
+        period_start=period_start,
+        period_end=period_end,
+    )
+    return [InvoiceRead.model_validate(invoice) for invoice in invoices]
+
+
+@router.get("/export")
+def export_invoices(
+    format: Literal["csv", "xlsx"] = "xlsx",
+    provider_id: uuid.UUID | None = None,
+    utility_type: UtilityType | None = None,
+    invoice_type: InvoiceType | None = None,
+    pod: str | None = None,
+    invoice_number: str | None = None,
+    period_start: date | None = None,
+    period_end: date | None = None,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_tenant_db),
+) -> Response:
+    invoices = fetch_invoices(
+        db=db,
+        tenant_id=current_user.tenant_id,
+        provider_id=provider_id,
+        utility_type=utility_type,
+        invoice_type=invoice_type,
+        pod=pod,
+        invoice_number=invoice_number,
+        period_start=period_start,
+        period_end=period_end,
     )
 
-    if provider_id is not None:
-        query = query.where(Invoice.provider_id == provider_id)
-    if utility_type is not None:
-        query = query.where(Invoice.utility_type == utility_type)
-    if invoice_type is not None:
-        query = query.where(Invoice.invoice_type == invoice_type)
-    if pod is not None:
-        query = query.where(Invoice.pod == pod)
-    if invoice_number is not None:
-        query = query.where(Invoice.invoice_number == invoice_number)
-    if period_start is not None:
-        query = query.where(Invoice.billing_period_end >= period_start)
-    if period_end is not None:
-        query = query.where(Invoice.billing_period_start <= period_end)
+    content = invoices_to_csv(invoices) if format == "csv" else invoices_to_xlsx(invoices)
 
-    query = query.order_by(Invoice.invoice_date.desc().nulls_last())
-
-    invoices = db.scalars(query).all()
-    return [InvoiceRead.model_validate(invoice) for invoice in invoices]
+    return Response(
+        content=content,
+        media_type=_EXPORT_CONTENT_TYPES[format],
+        headers={"Content-Disposition": f'attachment; filename="szamlak.{format}"'},
+    )
