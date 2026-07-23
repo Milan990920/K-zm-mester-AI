@@ -55,3 +55,6 @@ jobs:
 
       - name: Run tests
         run: pytest -v
+
+      - name: Docker image builds
+        run: docker build -t kozmu-backend .

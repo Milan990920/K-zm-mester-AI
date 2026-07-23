@@ -36,3 +36,6 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Docker image builds
+        run: docker build -t kozmu-frontend .
