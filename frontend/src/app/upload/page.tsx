@@ -1,10 +1,11 @@
 "use client";
 
 import { DragEvent, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ApiError, DocumentUploadResult, uploadDocument } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { PageShell } from "@/components/layout/PageShell";
+import { TopNav } from "@/components/layout/TopNav";
 
 const STATUS_LABELS: Record<DocumentUploadResult["status"], string> = {
   uploaded: "Feltöltve",
@@ -14,12 +15,12 @@ const STATUS_LABELS: Record<DocumentUploadResult["status"], string> = {
   needs_review: "Ellenőrzés szükséges",
 };
 
-const STATUS_COLORS: Record<DocumentUploadResult["status"], string> = {
-  uploaded: "text-slate-500",
-  processing: "text-slate-500",
-  done: "text-emerald-600",
-  failed: "text-red-600",
-  needs_review: "text-amber-600",
+const STATUS_PILL_CLASS: Record<DocumentUploadResult["status"], string> = {
+  uploaded: "pill-neutral",
+  processing: "pill-neutral",
+  done: "pill-good",
+  failed: "pill-bad",
+  needs_review: "pill-warn",
 };
 
 interface UploadItem {
@@ -31,7 +32,7 @@ interface UploadItem {
 
 export default function UploadPage() {
   const router = useRouter();
-  const { user, isLoading, accessToken } = useAuth();
+  const { user, isLoading, logout, accessToken } = useAuth();
   const [isDragActive, setIsDragActive] = useState(false);
   const [items, setItems] = useState<UploadItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,72 +80,63 @@ export default function UploadPage() {
 
   if (isLoading || !user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="text-sm text-slate-500">Betöltés...</p>
+      <main className="flex min-h-screen items-center justify-center bg-bg">
+        <p className="text-sm text-muted">Betöltés...</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10">
-      <div className="mx-auto max-w-3xl">
-        <header className="mb-8 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-slate-900">Számla feltöltés</h1>
-          <Link href="/dashboard" className="text-sm text-slate-500 hover:underline">
-            Vissza a dashboardra
-          </Link>
-        </header>
+    <PageShell>
+      <TopNav active="upload" role={user.role} onLogout={logout} />
 
-        <div
-          onDragOver={(event) => {
-            event.preventDefault();
-            setIsDragActive(true);
-          }}
-          onDragLeave={() => setIsDragActive(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 text-center transition-colors ${
-            isDragActive ? "border-slate-500 bg-slate-100" : "border-slate-300 bg-white"
-          }`}
-        >
-          <p className="mb-1 text-sm font-medium text-slate-700">
-            Húzd ide a PDF számlá(ka)t, vagy kattints a tallózáshoz
-          </p>
-          <p className="text-xs text-slate-400">Több fájl is kiválasztható egyszerre</p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/pdf"
-            multiple
-            className="hidden"
-            onChange={(event) => handleFiles(event.target.files)}
-          />
-        </div>
+      <h1 className="mb-6 text-xl font-semibold tracking-tight text-ink">Számla feltöltés</h1>
 
-        {items.length > 0 && (
-          <ul className="mt-6 flex flex-col gap-2">
-            {items.map((item, index) => (
-              <li
-                key={`${item.filename}-${index}`}
-                className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm"
-              >
-                <span className="text-slate-700">{item.filename}</span>
-                {item.status === "uploading" && (
-                  <span className="text-slate-400">Feltöltés és feldolgozás...</span>
-                )}
-                {item.status === "done" && item.result && (
-                  <span className={`font-medium ${STATUS_COLORS[item.result.status]}`}>
-                    {STATUS_LABELS[item.result.status]}
-                  </span>
-                )}
-                {item.status === "error" && (
-                  <span className="font-medium text-red-600">{item.error}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+      <div
+        onDragOver={(event) => {
+          event.preventDefault();
+          setIsDragActive(true);
+        }}
+        onDragLeave={() => setIsDragActive(false)}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-12 text-center transition-colors ${
+          isDragActive ? "border-accent bg-accent-soft" : "border-border bg-card"
+        }`}
+      >
+        <div className="mb-2 text-2xl">📄</div>
+        <p className="mb-1 text-sm font-semibold text-ink">
+          Húzd ide a PDF számlá(ka)t, vagy kattints a tallózáshoz
+        </p>
+        <p className="text-xs text-faint">Több fájl is kiválasztható egyszerre</p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf"
+          multiple
+          className="hidden"
+          onChange={(event) => handleFiles(event.target.files)}
+        />
       </div>
-    </main>
+
+      {items.length > 0 && (
+        <ul className="mt-6 flex flex-col gap-2">
+          {items.map((item, index) => (
+            <li key={`${item.filename}-${index}`} className="card flex items-center justify-between px-4 py-3 text-sm">
+              <span className="text-ink">{item.filename}</span>
+              {item.status === "uploading" && (
+                <span className="pill-neutral">Feltöltés és feldolgozás...</span>
+              )}
+              {item.status === "done" && item.result && (
+                <span className={STATUS_PILL_CLASS[item.result.status]}>
+                  {STATUS_LABELS[item.result.status]}
+                </span>
+              )}
+              {item.status === "error" && <span className="pill-bad">{item.error}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </PageShell>
   );
 }

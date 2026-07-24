@@ -1,21 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DashboardSummary, fetchDashboardSummary } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { UTILITY_COLORS, UTILITY_LABELS } from "@/lib/utility-labels";
 import { ChartSeries, MonthlyBarChart } from "@/components/charts/MonthlyBarChart";
 import { StatTile } from "@/components/charts/StatTile";
-
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  partner: "Partner",
-  customer_admin: "Ügyfél adminisztrátor",
-  customer_user: "Ügyfél felhasználó",
-};
+import { PageShell } from "@/components/layout/PageShell";
+import { TopNav } from "@/components/layout/TopNav";
 
 function formatCurrency(value: number, currency: string): string {
   return `${Math.round(value).toLocaleString("hu-HU")} ${currency}`;
@@ -50,8 +43,8 @@ export default function DashboardPage() {
 
   if (isLoading || !user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="text-sm text-slate-500">Betöltés...</p>
+      <main className="flex min-h-screen items-center justify-center bg-bg">
+        <p className="text-sm text-muted">Betöltés...</p>
       </main>
     );
   }
@@ -62,7 +55,7 @@ export default function DashboardPage() {
     {
       key: "cost",
       label: "Bruttó összeg",
-      color: UTILITY_COLORS.electricity,
+      color: "var(--accent)",
       valuesByMonth: Object.fromEntries(
         (summary?.monthly_costs ?? []).map((m) => [m.month, m.gross_amount_sum]),
       ),
@@ -85,88 +78,51 @@ export default function DashboardPage() {
   }));
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Közmű Mester</h1>
-            <p className="text-sm text-slate-500">
-              Bejelentkezve mint {ROLE_LABELS[user.role] ?? user.role}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/upload"
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              Számla feltöltése
-            </Link>
-            <Link
-              href="/invoices"
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-            >
-              Számlák
-            </Link>
-            {user.role === "customer_admin" && (
-              <Link
-                href="/users"
-                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-              >
-                Felhasználók
-              </Link>
-            )}
-            <button
-              onClick={logout}
-              className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-            >
-              Kijelentkezés
-            </button>
-          </div>
-        </header>
+    <PageShell>
+      <TopNav active="dashboard" role={user.role} onLogout={logout} />
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <DashboardCard title="Havi költség (utolsó 12 hónap)">
-            <MonthlyBarChart
-              months={months}
-              series={costSeries}
-              valueFormatter={(v) => formatCurrency(v, costCurrency)}
-              emptyLabel="Még nincs elegendő adat a grafikonhoz"
-            />
-          </DashboardCard>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <DashboardCard title="Havi költség (utolsó 12 hónap)">
+          <MonthlyBarChart
+            months={months}
+            series={costSeries}
+            valueFormatter={(v) => formatCurrency(v, costCurrency)}
+            emptyLabel="Még nincs elegendő adat a grafikonhoz"
+          />
+        </DashboardCard>
 
-          <DashboardCard title="Havi fogyasztás közműnként">
-            <MonthlyBarChart
-              months={months}
-              series={consumptionSeries}
-              valueFormatter={(v) => v.toLocaleString("hu-HU")}
-              emptyLabel="Még nincs elegendő adat a grafikonhoz"
-            />
-          </DashboardCard>
+        <DashboardCard title="Havi fogyasztás közműnként">
+          <MonthlyBarChart
+            months={months}
+            series={consumptionSeries}
+            valueFormatter={(v) => v.toLocaleString("hu-HU")}
+            emptyLabel="Még nincs elegendő adat a grafikonhoz"
+          />
+        </DashboardCard>
 
-          <DashboardCard title="Éves költség (idei év)">
-            <StatTile
-              label="Összesen"
-              value={
-                summary
-                  ? formatCurrency(summary.yearly_total_cost, summary.yearly_total_cost_currency)
-                  : "—"
-              }
-            />
-          </DashboardCard>
+        <DashboardCard title="Éves költség (idei év)">
+          <StatTile
+            label="Összesen"
+            value={
+              summary
+                ? formatCurrency(summary.yearly_total_cost, summary.yearly_total_cost_currency)
+                : "—"
+            }
+          />
+        </DashboardCard>
 
-          <DashboardCard title="AI asszisztens">
-            <p className="text-sm text-slate-400">Hamarosan elérhető</p>
-          </DashboardCard>
-        </div>
+        <DashboardCard title="AI asszisztens">
+          <p className="text-sm text-faint">Hamarosan elérhető</p>
+        </DashboardCard>
       </div>
-    </main>
+    </PageShell>
   );
 }
 
 function DashboardCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="mb-3 text-sm font-medium text-slate-700">{title}</h2>
+    <div className="card p-5">
+      <h2 className="section-title">{title}</h2>
       {children}
     </div>
   );

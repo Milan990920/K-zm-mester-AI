@@ -50,7 +50,7 @@ export function MonthlyBarChart({
 
   const hasData = series.some((s) => Object.values(s.valuesByMonth).some((v) => v > 0));
   if (!hasData) {
-    return <p className="text-sm text-slate-400">{emptyLabel}</p>;
+    return <p className="text-sm text-faint">{emptyLabel}</p>;
   }
 
   const maxValue = Math.max(
@@ -75,7 +75,7 @@ export function MonthlyBarChart({
               x2={100}
               y1={y}
               y2={y}
-              stroke="#e1e0d9"
+              stroke="var(--card-border)"
               strokeWidth={0.3}
               vectorEffect="non-scaling-stroke"
             />
@@ -120,7 +120,7 @@ export function MonthlyBarChart({
         })}
       </svg>
 
-      <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+      <div className="mt-1 flex justify-between font-mono text-[10px] text-faint">
         {months.map((month, index) => (
           <span key={month} className={index % 2 === 1 && months.length > 8 ? "invisible" : ""}>
             {formatMonthLabel(month)}
@@ -131,7 +131,7 @@ export function MonthlyBarChart({
       {series.length > 1 && (
         <div className="mt-3 flex flex-wrap gap-3">
           {series.map((s) => (
-            <div key={s.key} className="flex items-center gap-1.5 text-xs text-slate-600">
+            <div key={s.key} className="flex items-center gap-1.5 text-xs text-muted">
               <span
                 className="inline-block h-2 w-2 rounded-full"
                 style={{ backgroundColor: s.color }}

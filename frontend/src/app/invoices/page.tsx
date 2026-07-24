@@ -14,6 +14,8 @@ import {
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { UTILITY_LABELS } from "@/lib/utility-labels";
+import { PageShell } from "@/components/layout/PageShell";
+import { TopNav } from "@/components/layout/TopNav";
 
 const INVOICE_TYPE_LABELS: Record<string, string> = {
   commercial: "Kereskedelmi",
@@ -41,6 +43,13 @@ const VALIDATION_LABELS: Record<Invoice["validation_status"], string> = {
   needs_review: "Ellenőrzés szükséges",
 };
 
+const VALIDATION_PILL_CLASS: Record<Invoice["validation_status"], string> = {
+  pending: "pill-neutral",
+  valid: "pill-good",
+  invalid: "pill-bad",
+  needs_review: "pill-warn",
+};
+
 function formatAmount(amount: number | null, currency: string): string {
   if (amount === null) return "—";
   return `${amount.toLocaleString("hu-HU")} ${currency}`;
@@ -48,7 +57,7 @@ function formatAmount(amount: number | null, currency: string): string {
 
 export default function InvoicesPage() {
   const router = useRouter();
-  const { user, isLoading, accessToken } = useAuth();
+  const { user, isLoading, logout, accessToken } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(true);
@@ -121,193 +130,181 @@ export default function InvoicesPage() {
 
   if (isLoading || !user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="text-sm text-slate-500">Betöltés...</p>
+      <main className="flex min-h-screen items-center justify-center bg-bg">
+        <p className="text-sm text-muted">Betöltés...</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-8 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-slate-900">Számlák</h1>
-          <div className="flex items-center gap-3">
-            {invoices.length > 0 && (
-              <>
-                <button
-                  onClick={() => handleExport("xlsx")}
-                  disabled={isExporting}
-                  className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-                >
-                  Export Excel
-                </button>
-                <button
-                  onClick={() => handleExport("csv")}
-                  disabled={isExporting}
-                  className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-                >
-                  Export CSV
-                </button>
-              </>
-            )}
-            <Link href="/dashboard" className="text-sm text-slate-500 hover:underline">
-              Vissza a dashboardra
-            </Link>
-          </div>
-        </header>
+    <PageShell>
+      <TopNav active="invoices" role={user.role} onLogout={logout} />
 
-        <div className="mb-6 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-3 lg:grid-cols-6">
-          <select
-            value={filters.utility_type ?? ""}
-            onChange={(e) => updateFilter({ utility_type: e.target.value || undefined })}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          >
-            <option value="">Összes közmű</option>
-            {Object.entries(UTILITY_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filters.invoice_type ?? ""}
-            onChange={(e) => updateFilter({ invoice_type: e.target.value || undefined })}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          >
-            <option value="">Összes számlatípus</option>
-            {Object.entries(INVOICE_TYPE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            placeholder="Számlaszám"
-            value={filters.invoice_number ?? ""}
-            onChange={(e) => updateFilter({ invoice_number: e.target.value || undefined })}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          />
-          <input
-            type="text"
-            placeholder="POD"
-            value={filters.pod ?? ""}
-            onChange={(e) => updateFilter({ pod: e.target.value || undefined })}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          />
-          <input
-            type="date"
-            aria-label="Időszak kezdete"
-            value={filters.period_start ?? ""}
-            onChange={(e) => updateFilter({ period_start: e.target.value || undefined })}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          />
-          <input
-            type="date"
-            aria-label="Időszak vége"
-            value={filters.period_end ?? ""}
-            onChange={(e) => updateFilter({ period_end: e.target.value || undefined })}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          />
-        </div>
-
-        {isFetching && <p className="text-sm text-slate-500">Betöltés...</p>}
-        {error && <p className="text-sm text-red-600">{error}</p>}
-
-        {!isFetching && !error && invoices.length === 0 && (
-          <p className="text-sm text-slate-400">
-            {Object.keys(filters).length > 0
-              ? "Nincs a szűrésnek megfelelő számla."
-              : "Még nincs feltöltött számla."}
-          </p>
-        )}
-
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold tracking-tight text-ink">Számlák</h1>
         {invoices.length > 0 && (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200 text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Számlaszám</th>
-                  <th className="px-4 py-3">Közmű</th>
-                  <th className="px-4 py-3">Kelte</th>
-                  <th className="px-4 py-3">Bruttó összeg</th>
-                  <th className="px-4 py-3">Állapot</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((invoice) => (
-                  <Fragment key={invoice.id}>
-                    <tr className="border-b border-slate-100 last:border-0">
-                      <td className="px-4 py-3">
-                        <Link href={`/invoices/${invoice.id}`} className="text-slate-900 hover:underline">
-                          {invoice.invoice_number ?? "—"}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">{utilityTypeLabel(invoice)}</td>
-                      <td className="px-4 py-3">{invoice.invoice_date ?? "—"}</td>
-                      <td className="px-4 py-3">
-                        {formatAmount(invoice.gross_amount, invoice.currency)}
-                      </td>
-                      <td className="px-4 py-3">{VALIDATION_LABELS[invoice.validation_status]}</td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => toggleSites(invoice.id)}
-                          className="text-xs text-slate-500 hover:underline"
-                        >
-                          {expandedInvoiceId === invoice.id ? "Telephelyek elrejtése" : "Telephelyek"}
-                        </button>
-                      </td>
-                    </tr>
-                    {expandedInvoiceId === invoice.id && (
-                      <tr className="border-b border-slate-100 bg-slate-50">
-                        <td colSpan={6} className="px-4 py-3">
-                          {isSitesLoading && !sitesByInvoiceId[invoice.id] && (
-                            <p className="text-xs text-slate-400">Betöltés...</p>
-                          )}
-                          {sitesByInvoiceId[invoice.id]?.length === 0 && (
-                            <p className="text-xs text-slate-400">
-                              Ehhez a számlához nincs telephely-szintű bontás — egyetlen fogyasztási helyre
-                              vonatkozik.
-                            </p>
-                          )}
-                          {sitesByInvoiceId[invoice.id] && sitesByInvoiceId[invoice.id].length > 0 && (
-                            <table className="w-full text-xs">
-                              <thead className="text-slate-500">
-                                <tr>
-                                  <th className="px-2 py-1 text-left">Telephely</th>
-                                  <th className="px-2 py-1 text-left">Azonosító</th>
-                                  <th className="px-2 py-1 text-right">Fogyasztás</th>
-                                  <th className="px-2 py-1 text-right">Bruttó összeg</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {sitesByInvoiceId[invoice.id].map((site) => (
-                                  <tr key={site.id} className="border-t border-slate-200">
-                                    <td className="px-2 py-1">{site.site_address}</td>
-                                    <td className="px-2 py-1">{site.site_identifier ?? "—"}</td>
-                                    <td className="px-2 py-1 text-right">
-                                      {site.consumption_value ?? "—"} {site.consumption_unit ?? ""}
-                                    </td>
-                                    <td className="px-2 py-1 text-right">
-                                      {formatAmount(site.gross_amount, invoice.currency)}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
+          <div className="flex gap-2">
+            <button onClick={() => handleExport("xlsx")} disabled={isExporting} className="btn-secondary">
+              Export Excel
+            </button>
+            <button onClick={() => handleExport("csv")} disabled={isExporting} className="btn-secondary">
+              Export CSV
+            </button>
           </div>
         )}
       </div>
-    </main>
+
+      <div className="card mb-6 grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-6">
+        <select
+          value={filters.utility_type ?? ""}
+          onChange={(e) => updateFilter({ utility_type: e.target.value || undefined })}
+          className="field-select"
+        >
+          <option value="">Összes közmű</option>
+          {Object.entries(UTILITY_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filters.invoice_type ?? ""}
+          onChange={(e) => updateFilter({ invoice_type: e.target.value || undefined })}
+          className="field-select"
+        >
+          <option value="">Összes számlatípus</option>
+          {Object.entries(INVOICE_TYPE_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <input
+          type="text"
+          placeholder="Számlaszám"
+          value={filters.invoice_number ?? ""}
+          onChange={(e) => updateFilter({ invoice_number: e.target.value || undefined })}
+          className="field-input"
+        />
+        <input
+          type="text"
+          placeholder="POD"
+          value={filters.pod ?? ""}
+          onChange={(e) => updateFilter({ pod: e.target.value || undefined })}
+          className="field-input"
+        />
+        <input
+          type="date"
+          aria-label="Időszak kezdete"
+          value={filters.period_start ?? ""}
+          onChange={(e) => updateFilter({ period_start: e.target.value || undefined })}
+          className="field-input"
+        />
+        <input
+          type="date"
+          aria-label="Időszak vége"
+          value={filters.period_end ?? ""}
+          onChange={(e) => updateFilter({ period_end: e.target.value || undefined })}
+          className="field-input"
+        />
+      </div>
+
+      {isFetching && <p className="text-sm text-muted">Betöltés...</p>}
+      {error && <p className="rounded-lg bg-bad-soft px-3 py-2 text-sm font-medium text-bad">{error}</p>}
+
+      {!isFetching && !error && invoices.length === 0 && (
+        <p className="text-sm text-faint">
+          {Object.keys(filters).length > 0
+            ? "Nincs a szűrésnek megfelelő számla."
+            : "Még nincs feltöltött számla."}
+        </p>
+      )}
+
+      {invoices.length > 0 && (
+        <div className="card overflow-x-auto">
+          <table className="app-table">
+            <thead>
+              <tr>
+                <th>Számlaszám</th>
+                <th>Közmű</th>
+                <th>Kelte</th>
+                <th>Bruttó összeg</th>
+                <th>Állapot</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((invoice) => (
+                <Fragment key={invoice.id}>
+                  <tr>
+                    <td className="font-mono">
+                      <Link href={`/invoices/${invoice.id}`} className="text-ink hover:text-accent">
+                        {invoice.invoice_number ?? "—"}
+                      </Link>
+                    </td>
+                    <td>{utilityTypeLabel(invoice)}</td>
+                    <td className="font-mono tabular-nums">{invoice.invoice_date ?? "—"}</td>
+                    <td className="font-mono tabular-nums">
+                      {formatAmount(invoice.gross_amount, invoice.currency)}
+                    </td>
+                    <td>
+                      <span className={VALIDATION_PILL_CLASS[invoice.validation_status]}>
+                        {VALIDATION_LABELS[invoice.validation_status]}
+                      </span>
+                    </td>
+                    <td>
+                      <button onClick={() => toggleSites(invoice.id)} className="text-xs text-muted hover:text-accent">
+                        {expandedInvoiceId === invoice.id ? "Telephelyek elrejtése" : "Telephelyek"}
+                      </button>
+                    </td>
+                  </tr>
+                  {expandedInvoiceId === invoice.id && (
+                    <tr>
+                      <td colSpan={6} className="bg-bg">
+                        {isSitesLoading && !sitesByInvoiceId[invoice.id] && (
+                          <p className="text-xs text-faint">Betöltés...</p>
+                        )}
+                        {sitesByInvoiceId[invoice.id]?.length === 0 && (
+                          <p className="text-xs text-faint">
+                            Ehhez a számlához nincs telephely-szintű bontás — egyetlen fogyasztási helyre
+                            vonatkozik.
+                          </p>
+                        )}
+                        {sitesByInvoiceId[invoice.id] && sitesByInvoiceId[invoice.id].length > 0 && (
+                          <table className="w-full text-xs">
+                            <thead className="text-faint">
+                              <tr>
+                                <th className="px-2 py-1 text-left">Telephely</th>
+                                <th className="px-2 py-1 text-left">Azonosító</th>
+                                <th className="px-2 py-1 text-right">Fogyasztás</th>
+                                <th className="px-2 py-1 text-right">Bruttó összeg</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {sitesByInvoiceId[invoice.id].map((site) => (
+                                <tr key={site.id} className="border-t border-border">
+                                  <td className="px-2 py-1">{site.site_address}</td>
+                                  <td className="px-2 py-1 font-mono">{site.site_identifier ?? "—"}</td>
+                                  <td className="px-2 py-1 text-right font-mono tabular-nums">
+                                    {site.consumption_value ?? "—"} {site.consumption_unit ?? ""}
+                                  </td>
+                                  <td className="px-2 py-1 text-right font-mono tabular-nums">
+                                    {formatAmount(site.gross_amount, invoice.currency)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </PageShell>
   );
 }

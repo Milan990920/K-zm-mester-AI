@@ -28,50 +28,59 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-2xl font-semibold text-slate-900">Közmű Mester</h1>
-        <p className="mb-6 text-sm text-slate-500">Jelentkezz be a fiókodba</p>
+    <main className="flex min-h-screen items-center justify-center bg-bg px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex items-center gap-2 px-1">
+          <span className="rounded bg-accent-soft px-1.5 py-0.5 font-mono text-xs font-semibold tracking-wide text-accent">
+            KM
+          </span>
+          <span className="text-[15px] font-semibold tracking-tight text-ink">Közmű Mester</span>
+        </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
-              Email cím
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-            />
-          </div>
+        <div className="card p-8">
+          <h1 className="mb-1 text-xl font-semibold tracking-tight text-ink text-balance">
+            Jelentkezz be a fiókodba
+          </h1>
+          <p className="mb-6 text-sm text-muted">Add meg az ügyfélfiókod adatait</p>
 
-          <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
-              Jelszó
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div>
+              <label htmlFor="email" className="field-label">
+                Email cím
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="field-input"
+              />
+            </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+            <div>
+              <label htmlFor="password" className="field-label">
+                Jelszó
+              </label>
+              <input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="field-input"
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="mt-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
-          >
-            {isSubmitting ? "Bejelentkezés..." : "Bejelentkezés"}
-          </button>
-        </form>
+            {error && (
+              <p className="rounded-lg bg-bad-soft px-3 py-2 text-sm font-medium text-bad">{error}</p>
+            )}
+
+            <button type="submit" disabled={isSubmitting} className="btn-primary mt-2 w-full">
+              {isSubmitting ? "Bejelentkezés..." : "Bejelentkezés"}
+            </button>
+          </form>
+        </div>
       </div>
     </main>
   );
