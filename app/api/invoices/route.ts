@@ -8,11 +8,48 @@ import { formDataToInvoicePayload } from "@/lib/formDataToInvoicePayload";
 import { InvalidAttachmentError, saveAttachment } from "@/lib/storage";
 import { computeUnitPrice, computeVatAndGross } from "@/lib/calculations/pricing";
 
+function csv(value: string | null): string[] | undefined {
+  return value ? value.split(",").filter(Boolean) : undefined;
+}
+
 export async function GET(request: NextRequest) {
-  const meteringPointId = request.nextUrl.searchParams.get("meteringPointId");
+  const params = request.nextUrl.searchParams;
+  const customerId = params.get("customerId");
+  const meteringPointId = params.get("meteringPointId");
+  const siteIds = csv(params.get("siteIds"));
+  const meteringPointIds = csv(params.get("meteringPointIds"));
+  const energyTypeIds = csv(params.get("energyTypeIds"));
+  const provider = params.get("provider");
+  const paymentStatus = params.get("paymentStatus");
+  const periodFrom = params.get("periodFrom");
+  const periodTo = params.get("periodTo");
+  const q = params.get("q")?.trim();
+
+  // SPEC.md 5.2 — a szűrők ÉS-logikával kombinálódnak.
+  const where: Record<string, unknown> = {};
+  if (customerId) where.customerId = customerId;
+  if (meteringPointId) where.meteringPointId = meteringPointId;
+  if (siteIds) where.siteId = { in: siteIds };
+  if (meteringPointIds) where.meteringPointId = { in: meteringPointIds };
+  if (energyTypeIds) where.energyTypeId = { in: energyTypeIds };
+  if (provider) where.providerName = { contains: provider, mode: "insensitive" };
+  if (paymentStatus) where.paymentStatus = paymentStatus;
+  // Az időszak-szűrő azokat a számlákat adja vissza, amelyek elszámolási
+  // időszaka átfedésben van a kiválasztott intervallummal (nem azt várja
+  // el, hogy a számla teljes egészében bele essen) — ez felel meg annak,
+  // amit a "aktuális hónap/negyedév/év" gyorsgomboktól elvár a felhasználó.
+  if (periodFrom) where.periodEnd = { gte: new Date(periodFrom) };
+  if (periodTo) where.periodStart = { lte: new Date(periodTo) };
+  if (q) {
+    where.OR = [
+      { invoiceNumber: { contains: q, mode: "insensitive" } },
+      { meterSerialNumber: { contains: q, mode: "insensitive" } },
+      { meteringPoint: { podCode: { contains: q, mode: "insensitive" } } },
+    ];
+  }
 
   const invoices = await prisma.invoice.findMany({
-    where: meteringPointId ? { meteringPointId } : undefined,
+    where,
     orderBy: { issueDate: "desc" },
     include: { customer: true, site: true, meteringPoint: true, energyType: true },
   });

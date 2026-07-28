@@ -91,6 +91,9 @@ export default function CustomerDetailPage() {
             {customer.contactPhone && <span>{customer.contactPhone}</span>}
           </div>
         </div>
+        <Link href={`/customers/${customer.id}/invoices`} className="btn-outline">
+          Számlák megtekintése
+        </Link>
       </div>
 
       <div className="mb-4 flex items-center justify-between">
