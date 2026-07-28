@@ -37,7 +37,7 @@ export default function NewCustomerPage() {
   }
 
   return (
-    <main className="mx-auto max-w-lg px-6 py-16">
+    <main className="mx-auto max-w-lg px-6 py-12">
       <Link href="/" className="link-quiet mb-8 inline-block text-sm text-muted">
         ← Ügyfelek
       </Link>

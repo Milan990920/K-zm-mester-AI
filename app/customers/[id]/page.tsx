@@ -66,14 +66,14 @@ export default function CustomerDetailPage() {
 
   if (!customer) {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-16">
+      <main className="mx-auto max-w-3xl px-6 py-12">
         <p className="text-sm text-muted">Betöltés…</p>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16">
+    <main className="mx-auto max-w-3xl px-6 py-12">
       <Link href="/" className="link-quiet mb-8 inline-block text-sm text-muted">
         ← Ügyfelek
       </Link>
@@ -164,6 +164,12 @@ export default function CustomerDetailPage() {
                     </span>
                     <span className="ml-auto text-xs text-muted">{mp.providerName ?? "—"}</span>
                     {!mp.isActive && <span className="badge bg-muted/10 text-muted">Inaktív</span>}
+                    <Link
+                      href={`/invoices/new?customerId=${customer.id}&siteId=${site.id}&meteringPointId=${mp.id}`}
+                      className="text-xs font-semibold text-brass hover:underline"
+                    >
+                      + Számla
+                    </Link>
                   </li>
                 ))}
               </ul>

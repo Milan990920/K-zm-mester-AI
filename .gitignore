@@ -36,3 +36,6 @@ backend/alembic/versions/__pycache__/
 
 # Local document storage (dev fallback for GCS)
 backend/data/
+
+# Local invoice attachment storage (SPEC.md 6. pont)
+/uploads/

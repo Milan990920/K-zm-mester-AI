@@ -33,10 +33,10 @@ export default function CustomerSelectorPage() {
   const isEmpty = customers !== null && customers.length === 0 && query === "";
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16">
+    <main className="mx-auto max-w-3xl px-6 py-12">
       <div className="mb-10 flex items-end justify-between gap-4">
         <div>
-          <p className="eyebrow mb-2">Számlamenedzsment</p>
+          <p className="eyebrow mb-2">Ügyfélválasztó</p>
           <h1 className="font-display text-[28px] font-semibold leading-tight tracking-tight text-ink">
             Ügyfelek
           </h1>
