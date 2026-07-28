@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* SPEC.md 7. pont — "Mérőóra és számlakönyv": mérnöki grafikonpapír-háttér,
+   halvány (~5% opacitású) rácsvonalakkal, mert a tartalom maga is mérési
+   pontokból és sorba rendezett számlákból áll. */
+body {
+  color: #1e2422;
+  background-color: #f3f5f1;
+  background-image: linear-gradient(rgba(185, 194, 180, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(185, 194, 180, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-attachment: fixed;
+}
+
+@layer utilities {
+  .font-tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

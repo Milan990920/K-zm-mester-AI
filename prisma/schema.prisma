@@ -1,0 +1,145 @@
+// Adatmodell — SPEC.md 3. pont.
+// Az energianem-mértékegység szabály (3.2) szándékosan NEM adatbázis-szintű
+// enum, hanem admin-szerkeszthető tábla (EnergyType.allowedUnits) — új
+// energianem így kódmódosítás nélkül felvehető. A tényleges kikényszerítés a
+// lib/validations zod sémáiban történik, mert az csak ott ellenőrizhető
+// együtt a felhasználó által ténylegesen beküldött (energyTypeId, unit) párral.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model EnergyType {
+  id           String   @id @default(cuid())
+  code         String   @unique // pl. "electricity" — badge-szín és ikon kulcsa
+  name         String // pl. "Villamos energia"
+  allowedUnits String[] // pl. ["kWh", "MWh"] — kizárólag ezek választhatók számlán
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  meteringPoints MeteringPoint[]
+  invoices       Invoice[]
+}
+
+model Customer {
+  id           String   @id @default(cuid())
+  name         String
+  taxNumber    String?
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sites    Site[]
+  invoices Invoice[]
+}
+
+model Site {
+  id         String   @id @default(cuid())
+  customerId String
+  name       String
+  address    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer       Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  meteringPoints MeteringPoint[]
+  invoices       Invoice[]
+
+  @@index([customerId])
+}
+
+model MeteringPoint {
+  id                   String   @id @default(cuid())
+  siteId               String
+  podCode              String // villamos energia: 33 karakter; földgáz: 16, "39N" prefix — csak figyelmeztetés, nem tiltás
+  energyTypeId         String
+  providerName         String? // kereskedő
+  networkOperatorName  String? // hálózati engedélyes, ha eltér a kereskedőtől
+  currentMeterSerial   String? // tájékoztató jellegű — a számlázott gyári szám mindig a számlán van rögzítve
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  site       Site       @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  energyType EnergyType @relation(fields: [energyTypeId], references: [id])
+  invoices   Invoice[]
+
+  @@index([siteId])
+  @@index([energyTypeId])
+}
+
+enum InvoiceType {
+  SETTLEMENT // elszámoló
+  PARTIAL // részszámla
+  CONSOLIDATED // göngyölített
+  CREDIT // jóváíró
+}
+
+enum PaymentStatus {
+  OPEN // nyitott
+  PAID // fizetve
+  OVERDUE // késedelmes
+}
+
+enum InvoiceSource {
+  MANUAL // kézi rögzítés
+  PDF_UPLOAD // feltöltött PDF
+}
+
+model Invoice {
+  id String @id @default(cuid())
+
+  // Az ügyfél denormalizálva a gyors listázáshoz (SPEC.md 3.1) — mindig a
+  // site.customerId-vel kell megegyeznie, ezt az app-réteg kényszeríti ki.
+  customerId      String
+  siteId          String
+  meteringPointId String
+  energyTypeId    String // kötelezően meg kell egyeznie a meteringPoint energiatípusával
+
+  providerName  String
+  invoiceNumber String
+  issueDate     DateTime
+  periodStart   DateTime
+  periodEnd     DateTime
+  dueDate       DateTime?
+
+  quantity          Float
+  unit              String // csak az energyType.allowedUnits egyike lehet — zod kényszeríti ki
+  meterSerialNumber String? // a számlán ténylegesen szereplő gyári szám
+
+  netAmount   Float
+  vatRate     Float
+  vatAmount   Float
+  grossAmount Float
+  currency    String @default("HUF")
+  unitPrice   Float? // megadható, vagy grossAmount/quantity-ből számolható
+
+  invoiceType   InvoiceType
+  paymentStatus PaymentStatus @default(OPEN)
+
+  attachmentPath String? // feltöltött PDF/kép elérési útja
+  sourceType     InvoiceSource @default(MANUAL)
+  isDraft        Boolean       @default(false) // hiányos számla csak piszkozatként menthető
+
+  recordedBy String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  site          Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  meteringPoint MeteringPoint @relation(fields: [meteringPointId], references: [id], onDelete: Cascade)
+  energyType    EnergyType    @relation(fields: [energyTypeId], references: [id])
+
+  @@index([customerId])
+  @@index([siteId])
+  @@index([meteringPointId])
+  @@index([energyTypeId])
+  @@index([meteringPointId, providerName, invoiceNumber]) // duplikátum-figyelmeztetés kereséséhez
+}
