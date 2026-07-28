@@ -20,7 +20,7 @@ export function formatPeriod(start: Date, end: Date): string {
 }
 
 /** 1234567.5 -> "1 234 567,5" — sima szóköz ezres elválasztóként, vessző tizedesjelként. */
-function groupThousands(value: number): string {
+export function groupThousands(value: number): string {
   const isNegative = value < 0;
   const [intPart, fracPart] = Math.abs(value).toString().split(".");
   const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
@@ -42,4 +42,14 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 export function formatAmount(amount: number, currency: string): string {
   const symbol = CURRENCY_SYMBOLS[currency] ?? currency;
   return `${groupThousands(Math.round(amount))} ${symbol}`;
+}
+
+/** 12450000 -> "12,5 M", 8200 -> "8,2 E" — kompakt jelölés dashboard
+ * hőtérkép-celláknak és KPI-kártyáknak, ahol a teljes ezres tagolás túl sok helyet foglalna. */
+export function formatCompactAmount(amount: number): string {
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1).replace(".", ",")} M`;
+  if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(1).replace(".", ",")} E`;
+  return `${sign}${Math.round(abs)}`;
 }

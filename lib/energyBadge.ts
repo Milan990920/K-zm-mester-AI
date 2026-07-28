@@ -12,3 +12,19 @@ export const ENERGY_BADGE_CLASSES: Record<string, string> = {
 export function energyBadgeClass(code: string): string {
   return ENERGY_BADGE_CLASSES[code] ?? "bg-muted/10 text-muted";
 }
+
+// Ugyanazok a színek hex formában — a dashboard grafikonjai (SPEC.md 5.4)
+// nem tudnak Tailwind osztályt használni SVG fill-ként, ezért kell a
+// tailwind.config.ts "energy.*" színeivel megegyező hex-forrás.
+export const ENERGY_HEX_COLORS: Record<string, string> = {
+  electricity: "#2F6FA3",
+  gas: "#C97A2E",
+  district_heating: "#B8402F",
+  water: "#2E8F92",
+  sewage: "#5C6B63",
+  fuel: "#6B4F8A",
+};
+
+export function energyHexColor(code: string): string {
+  return ENERGY_HEX_COLORS[code] ?? "#5C6B63";
+}
