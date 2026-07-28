@@ -3,19 +3,74 @@
 @tailwind utilities;
 
 /* SPEC.md 7. pont — "Mérőóra és számlakönyv": mérnöki grafikonpapír-háttér,
-   halvány (~5% opacitású) rácsvonalakkal, mert a tartalom maga is mérési
+   halvány rácsvonalakkal (finom + minden negyedik vonal kicsit erősebb,
+   ahogy egy valódi milliméterpapíron), mert a tartalom maga is mérési
    pontokból és sorba rendezett számlákból áll. */
 body {
   color: #1e2422;
   background-color: #f3f5f1;
-  background-image: linear-gradient(rgba(185, 194, 180, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(185, 194, 180, 0.05) 1px, transparent 1px);
-  background-size: 28px 28px;
+  background-image:
+    linear-gradient(rgba(185, 194, 180, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(185, 194, 180, 0.09) 1px, transparent 1px),
+    linear-gradient(rgba(185, 194, 180, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(185, 194, 180, 0.045) 1px, transparent 1px);
+  background-size:
+    112px 112px,
+    112px 112px,
+    16px 16px,
+    16px 16px;
   background-attachment: fixed;
 }
 
 @layer utilities {
   .font-tabular {
     font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .surface {
+    @apply rounded-[14px] border border-border bg-card/95 shadow-[0_1px_2px_rgba(30,36,34,0.04),0_12px_28px_-16px_rgba(30,36,34,0.18)] backdrop-blur-[2px];
+  }
+
+  .eyebrow {
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-muted/80;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted;
+  }
+  .field-input {
+    @apply w-full rounded-lg border border-border bg-white px-3.5 py-2.5 text-[15px] text-ink shadow-[inset_0_1px_2px_rgba(30,36,34,0.03)] transition-colors placeholder:text-muted/60 focus:border-brass/70 focus:outline-none focus:ring-2 focus:ring-brass/15;
+  }
+  .field-select {
+    @apply field-input appearance-none bg-no-repeat pr-9;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%235C6B63' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-position: right 0.9rem center;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold tracking-[0.01em] transition-all duration-150 disabled:pointer-events-none disabled:opacity-45;
+  }
+  .btn-brass {
+    @apply btn bg-ink text-[#F3F1E8] shadow-[0_1px_0_rgba(184,134,59,0.6)_inset,0_10px_22px_-12px_rgba(30,36,34,0.55)] hover:bg-[#141917] active:translate-y-px;
+  }
+  .btn-outline {
+    @apply btn border border-border bg-white/70 text-ink hover:border-brass/50 hover:bg-white active:translate-y-px;
+  }
+  .btn-ghost {
+    @apply btn text-muted hover:text-ink;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11.5px] font-semibold leading-none;
+  }
+
+  .link-quiet {
+    @apply text-ink underline decoration-border decoration-2 underline-offset-4 transition-colors hover:decoration-brass;
+  }
+
+  .empty-state {
+    @apply surface flex flex-col items-center gap-2 px-8 py-14 text-center;
   }
 }
