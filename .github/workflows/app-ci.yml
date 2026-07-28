@@ -1,0 +1,76 @@
+name: App CI
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "prisma/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - "*.config.*"
+      - "tsconfig.json"
+      - ".github/workflows/app-ci.yml"
+  pull_request:
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "prisma/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - "*.config.*"
+      - "tsconfig.json"
+      - ".github/workflows/app-ci.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kozmu
+          POSTGRES_PASSWORD: kozmu
+          POSTGRES_DB: szamlamenedzsment
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kozmu -d szamlamenedzsment"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://kozmu:kozmu@localhost:5432/szamlamenedzsment
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run migrations + seed
+        run: |
+          npx prisma migrate deploy
+          npm run db:seed
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
