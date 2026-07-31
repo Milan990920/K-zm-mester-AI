@@ -239,8 +239,13 @@ export function extractInvoiceData(rawText: string): ExtractedInvoiceData {
   const taxNumbers = extractTaxNumbers(text);
   const providerName = extractProviderName(text, taxNumbers.providerIndex);
   const customerName = extractCustomerName(text);
+  // A "...sorszáma" címkéjű mezőt minden eddig látott formátumban (E.ON,
+  // VASIVÍZ) tisztán számjegyek alkotják — ezt szándékosan csak számjegyekre
+  // illesztjük, mert két oszlop néhol elválasztó nélkül fűződik egybe (pl.
+  // "sorszáma:262312160704A szolgáltatás megnevezése:"), és egy betűket is
+  // elfogadó minta belelógna a következő mező első karakterébe.
   const invoiceNumberMatch =
-    text.match(new RegExp(`${flexible("Számla sorszáma")}\\s*:?\\s*([A-Z0-9\\/]{4,})`, "i")) ??
+    text.match(new RegExp(`${flexible("Számla sorszáma")}\\s*:?\\s*(\\d{4,})`, "i")) ??
     text.match(new RegExp(`${flexible("Számla száma")}\\s*:?\\s*([A-Z0-9\\/]{4,})`, "i")) ??
     text.match(/Sorszám\s*:?\s*\n?\s*([A-Z0-9\/]{4,})/i);
   const issueDate = extractDate(text, ["Számla kelte", "Bizonylatdátum"]);

@@ -62,6 +62,15 @@ Bruttó számlaérték összesen**38 040
     expect(result.grossAmount).toBe(1510);
   });
 
+  it("stops a purely numeric invoice number at the digits, even glued to the next column's label", () => {
+    // Valós VASIVÍZ-számla mintája: "sorszáma:262312160704A szolgáltatás
+    // megnevezése:" — elválasztó nélkül folytatódik a szomszédos oszlop
+    // címkéjének első betűjével.
+    const text = "Adószáma: 11316385-2-18\nAdószáma:13980335-2-18\nSzámla sorszáma:262312160704A szolgáltatás megnevezése:";
+    const result = extractInvoiceData(text);
+    expect(result.invoiceNumber).toBe("262312160704");
+  });
+
   it("extracts a 16-character gas POD (39N prefix) even when glued to the next field", () => {
     const text = "POD:39N050146626000YFizetési határidő:2026.06.01";
     const result = extractInvoiceData(text);
