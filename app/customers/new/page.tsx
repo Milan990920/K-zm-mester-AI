@@ -1,13 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
 
 export default function NewCustomerPage() {
+  return (
+    <Suspense fallback={null}>
+      <NewCustomerForm />
+    </Suspense>
+  );
+}
+
+function NewCustomerForm() {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [taxNumber, setTaxNumber] = useState("");
+  const searchParams = useSearchParams();
+  const [name, setName] = useState(searchParams.get("name") ?? "");
+  const [taxNumber, setTaxNumber] = useState(searchParams.get("taxNumber") ?? "");
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { INVOICE_TYPE_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/labels";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { INVOICE_TYPE_LABELS } from "@/lib/labels";
 import { computeUnitPrice, computeVatAndGross } from "@/lib/calculations/pricing";
 
 interface EnergyType {
@@ -33,6 +33,30 @@ interface CustomerListItem {
   name: string;
 }
 
+interface ExtractedInvoiceData {
+  providerName: string | null;
+  customerTaxNumber: string | null;
+  customerName: string | null;
+  invoiceNumber: string | null;
+  issueDate: string | null;
+  periodStart: string | null;
+  periodEnd: string | null;
+  dueDate: string | null;
+  quantity: number | null;
+  unit: string | null;
+  netAmount: number | null;
+  vatRate: number | null;
+  grossAmount: number | null;
+  warnings: string[];
+}
+
+interface ExtractResponse {
+  extracted: ExtractedInvoiceData;
+  matchedCustomerId: string | null;
+  matchedSiteId: string | null;
+  matchedMeteringPointId: string | null;
+}
+
 export default function NewInvoicePage() {
   return (
     <Suspense fallback={null}>
@@ -50,6 +74,9 @@ function NewInvoiceForm() {
   const [customerDetail, setCustomerDetail] = useState<CustomerDetail | null>(null);
   const [siteId, setSiteId] = useState(searchParams.get("siteId") ?? "");
   const [meteringPointId, setMeteringPointId] = useState(searchParams.get("meteringPointId") ?? "");
+  const [pendingAutoFill, setPendingAutoFill] = useState<{ siteId: string | null; meteringPointId: string | null } | null>(
+    null,
+  );
 
   const [providerName, setProviderName] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -68,14 +95,22 @@ function NewInvoiceForm() {
   const [invoiceType, setInvoiceType] = useState("SETTLEMENT");
   const [file, setFile] = useState<File | null>(null);
 
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extraction, setExtraction] = useState<{ data: ExtractedInvoiceData; customerMatched: boolean } | null>(null);
+  const [extractError, setExtractError] = useState<string | null>(null);
+
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [warnings, setWarnings] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<"draft" | "final" | null>(null);
 
-  useEffect(() => {
+  function reloadCustomers() {
     fetch("/api/customers")
       .then((res) => res.json())
       .then(setCustomers);
+  }
+
+  useEffect(() => {
+    reloadCustomers();
   }, []);
 
   useEffect(() => {
@@ -88,6 +123,14 @@ function NewInvoiceForm() {
       .then(setCustomerDetail);
   }, [customerId]);
 
+  useEffect(() => {
+    if (customerDetail && pendingAutoFill) {
+      if (pendingAutoFill.siteId) setSiteId(pendingAutoFill.siteId);
+      if (pendingAutoFill.meteringPointId) setMeteringPointId(pendingAutoFill.meteringPointId);
+      setPendingAutoFill(null);
+    }
+  }, [customerDetail, pendingAutoFill]);
+
   const site = customerDetail?.sites.find((s) => s.id === siteId) ?? null;
   const meteringPoint = site?.meteringPoints.find((mp) => mp.id === meteringPointId) ?? null;
 
@@ -96,7 +139,16 @@ function NewInvoiceForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meteringPoint]);
 
+  // A PDF-ből felismert bruttó összeg a számlán szereplő pontos érték —
+  // ha ez rendelkezésre áll, ne írja felül a nettó×áfa-ból visszaszámolt
+  // (kerekítési eltérést tartalmazó) érték.
+  const skipNextRecompute = useRef(false);
+
   useEffect(() => {
+    if (skipNextRecompute.current) {
+      skipNextRecompute.current = false;
+      return;
+    }
     const net = Number(netAmount);
     const rate = Number(vatRate);
     if (netAmount && vatRate && !Number.isNaN(net) && !Number.isNaN(rate)) {
@@ -112,6 +164,53 @@ function NewInvoiceForm() {
     if (!grossAmount || !quantity || Number.isNaN(gross) || Number.isNaN(qty)) return null;
     return computeUnitPrice(gross, qty);
   }, [grossAmount, quantity]);
+
+  async function handleFileSelected(selectedFile: File | null) {
+    setFile(selectedFile);
+    setExtraction(null);
+    setExtractError(null);
+    if (!selectedFile || selectedFile.type !== "application/pdf") return;
+
+    setIsExtracting(true);
+    try {
+      const fd = new FormData();
+      fd.set("file", selectedFile);
+      const res = await fetch("/api/invoices/extract", { method: "POST", body: fd });
+      if (!res.ok) {
+        setExtractError("Nem sikerült automatikusan feldolgozni a PDF-et — töltsd ki kézzel az adatokat.");
+        return;
+      }
+      const data: ExtractResponse = await res.json();
+      const ex = data.extracted;
+
+      if (ex.providerName) setProviderName(ex.providerName);
+      if (ex.invoiceNumber) setInvoiceNumber(ex.invoiceNumber);
+      if (ex.issueDate) setIssueDate(ex.issueDate);
+      if (ex.periodStart) setPeriodStart(ex.periodStart);
+      if (ex.periodEnd) setPeriodEnd(ex.periodEnd);
+      if (ex.dueDate) setDueDate(ex.dueDate);
+      if (ex.quantity !== null) setQuantity(String(ex.quantity));
+      if (ex.unit) setUnit(ex.unit);
+      if (ex.grossAmount !== null) {
+        // A számlán szereplő pontos bruttó (és abból a pontos áfa) értéket
+        // használjuk, nem a nettó×áfa-ból visszaszámolt, kerekítő verziót.
+        skipNextRecompute.current = true;
+        if (ex.netAmount !== null) setVatAmount(String(Math.round((ex.grossAmount - ex.netAmount) * 100) / 100));
+      }
+      if (ex.netAmount !== null) setNetAmount(String(ex.netAmount));
+      if (ex.vatRate !== null) setVatRate(String(ex.vatRate));
+      if (ex.grossAmount !== null) setGrossAmount(String(ex.grossAmount));
+
+      setExtraction({ data: ex, customerMatched: !!data.matchedCustomerId });
+
+      if (data.matchedCustomerId) {
+        setCustomerId(data.matchedCustomerId);
+        setPendingAutoFill({ siteId: data.matchedSiteId, meteringPointId: data.matchedMeteringPointId });
+      }
+    } finally {
+      setIsExtracting(false);
+    }
+  }
 
   async function handleSubmit(isDraft: boolean) {
     setIsSubmitting(isDraft ? "draft" : "final");
@@ -170,6 +269,67 @@ function NewInvoiceForm() {
       <h1 className="mb-8 font-display text-2xl font-semibold tracking-tight text-ink">
         Számla kézi felvétele
       </h1>
+
+      <div className="surface mb-5 p-6">
+        <h2 className="section-heading">Melléklet</h2>
+        <p className="mb-3 text-xs text-muted">
+          PDF feltöltésekor megpróbáljuk automatikusan felismerni az ügyfelet, a szolgáltatót és a számla adatait —
+          ellenőrizd az alábbi mezőket mentés előtt.
+        </p>
+        <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-bg/60 px-6 py-8 text-center transition-colors hover:border-brass/50">
+          <span className="text-sm font-medium text-ink">
+            {file ? file.name : "Húzd ide a számla PDF-jét vagy képét, vagy kattints a tallózáshoz"}
+          </span>
+          <span className="text-xs text-muted">PDF, JPG vagy PNG, legfeljebb 15 MB</span>
+          <input
+            type="file"
+            accept="application/pdf,image/jpeg,image/png"
+            className="hidden"
+            onChange={(e) => handleFileSelected(e.target.files?.[0] ?? null)}
+          />
+        </label>
+        {firstError("file") && <FieldError message={firstError("file")!} />}
+
+        {isExtracting && <p className="mt-3 text-xs text-muted">Adatok felismerése a PDF-ből…</p>}
+        {extractError && <p className="mt-3 text-xs text-danger">{extractError}</p>}
+
+        {extraction && (
+          <div className="mt-3 rounded-lg border border-border bg-bg/60 p-3 text-xs">
+            <p className="mb-1 font-semibold text-ink">Automatikusan felismert adatok</p>
+            {extraction.data.customerTaxNumber && (
+              <p className="text-muted">
+                Ügyfél adószáma: <span className="font-mono text-ink">{extraction.data.customerTaxNumber}</span>{" "}
+                {extraction.customerMatched ? (
+                  <span className="text-brass">— egyezik egy meglévő ügyféllel</span>
+                ) : (
+                  <span className="text-danger">— nincs ilyen adószámú ügyfél rögzítve</span>
+                )}
+              </p>
+            )}
+            {!extraction.customerMatched && extraction.data.customerTaxNumber && (
+              <Link
+                href={`/customers/new?name=${encodeURIComponent(extraction.data.customerName ?? "")}&taxNumber=${encodeURIComponent(extraction.data.customerTaxNumber)}`}
+                target="_blank"
+                className="mt-1 inline-block font-semibold text-brass hover:underline"
+              >
+                + Új ügyfél létrehozása ezekkel az adatokkal (új lapon)
+              </Link>
+            )}
+            {!extraction.customerMatched && extraction.data.customerTaxNumber && (
+              <button type="button" onClick={reloadCustomers} className="ml-3 text-muted underline">
+                Ügyféllista frissítése
+              </button>
+            )}
+            {extraction.data.warnings.length > 0 && (
+              <ul className="mt-2 list-inside list-disc text-brass">
+                {extraction.data.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="surface mb-5 p-6">
         <h2 className="section-heading">Hova tartozik a számla</h2>
@@ -393,23 +553,6 @@ function NewInvoiceForm() {
             </p>
           </div>
         </div>
-      </div>
-
-      <div className="surface mb-6 p-6">
-        <h2 className="section-heading">Melléklet</h2>
-        <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-bg/60 px-6 py-8 text-center transition-colors hover:border-brass/50">
-          <span className="text-sm font-medium text-ink">
-            {file ? file.name : "Húzd ide a számla PDF-jét vagy képét, vagy kattints a tallózáshoz"}
-          </span>
-          <span className="text-xs text-muted">PDF, JPG vagy PNG, legfeljebb 15 MB</span>
-          <input
-            type="file"
-            accept="application/pdf,image/jpeg,image/png"
-            className="hidden"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-        </label>
-        {firstError("file") && <FieldError message={firstError("file")!} />}
       </div>
 
       {warnings.length > 0 && (

@@ -185,11 +185,33 @@ Villamos energia `#2F6FA3` · Földgáz `#C97A2E` · Távhő `#B8402F` · Víz `
 3. Számla CRUD: kézi rögzítés + PDF feltöltés és tárolás
 4. Szűrhető, az 5.3 pont szerint formázott számlalista
 5. Dashboard: KPI-k + a 4 grafikontípus
-6. **Jövőbeli bővítés (nem MVP):** automatikus szolgáltatói számlaletöltés, OCR-alapú adatkinyerés, szerepkör-/jogosultságkezelés, szerződésmenedzsment modul, riasztások
+6. **PDF-adatkinyerés (a felhasználó kifejezett kérésére, a tervezettnél korábban bevezetve):** feltöltött PDF számlából mintaillesztéssel felismert mezők (ügyfél adószáma és neve alapján automatikus ügyfél-párosítás, szolgáltató, számlaszám, dátumok, POD, mennyiség+mértékegység, összegek) előtöltik a kézi rögzítés űrlapját — ld. 6.1 pont.
+7. **Jövőbeli bővítés (nem MVP):** automatikus szolgáltatói számlaletöltés, AI-alapú (nem csak mintaillesztéses) adatkinyerés képfájlokból, szerepkör-/jogosultságkezelés, szerződésmenedzsment modul, riasztások
+
+### 6.1 PDF-adatkinyerés — megvalósítási jegyzet
+
+Az eredeti terv (9. pont) az OCR-t explicit 2. fázisra halasztotta volna, de a
+felhasználó valós közműszámla-mintákat adott (E.ON, EMoGÁ, MVM, távhő-
+szolgáltató), és kérte, hogy ezek alapján a rendszer ismerje fel az ügyfelet és
+a számla adatait feltöltéskor. Ez **nem AI/LLM-alapú OCR**, hanem a
+`lib/invoiceExtraction.ts`-ben implementált, a bemutatott formátumokból tanult
+mintaillesztés (`pdf-parse` szöveg-kinyerés + reguláris kifejezések):
+
+- Az ügyfél-azonosítás az adószám alapján történik (a dokumentumban talált
+  adószámok közül az első a szolgáltatóé, az utolsó az ügyfélé — ez a minta
+  mind a négy bemutatott formátumban konzisztens).
+- Ahol egy mező bizonytalanul volna felismerhető (pl. egy kapacitásdíj-számlán
+  nincs valódi fogyasztási mennyiség), a mező üresen marad, és figyelmeztetés
+  jelzi, hogy kézi ellenőrzés/kitöltés szükséges — sosem találgat.
+- Ez a megoldás a bemutatott (és hasonló elnevezésű mezőket használó)
+  szolgáltatói formátumokra általánosít jól; egy teljesen új elrendezésű
+  számlánál előfordulhat, hogy egyes mezőket nem ismer fel — ilyenkor a
+  kézi kitöltés marad az egyetlen út, amíg a mintakészlet bővül.
 
 ## 9. Amit kifejezetten ne csinálj
 
 - Ne engedd a szabad szöveges mértékegység-bevitelt.
 - Ne válaszd szét a mennyiséget és a mértékegységet külön UI-elemre, ahol egy értékként várható.
-- Ne építs bele a legelső verzióba automatikus szolgáltatói adatletöltést vagy OCR-t — ez legyen explicit 2. fázis.
+- Ne építs bele AI/LLM-alapú OCR-t (külső szolgáltatás, API-kulcs) — a PDF-adatkinyerés (6.1 pont) szándékosan önálló, mintaillesztéses és külső függőség nélküli.
+- Ne hagyd, hogy a felismerés hibás adatot írjon felül csendben — bizonytalan mezőnél inkább maradjon üresen, kézi kitöltésre várva.
 - Ne tegyél a 7. pontban leírt signature-elemen (mérőóra-tárcsa) felül semmilyen felesleges animációt vagy dekorációt.
