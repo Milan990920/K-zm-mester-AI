@@ -1,8 +1,8 @@
 import { Prisma } from "@prisma/client";
 
-// SPEC.md 5.2 — a szűrők ÉS-logikával kombinálódnak; ugyanez a szűrő-nyelvtan
-// szolgálja ki a számlalistát (/api/invoices) és a dashboardot (/api/dashboard),
-// hogy a két nézet sose térhessen el ugyanazon a szűrőállapoton.
+// A szűrők ÉS-logikával kombinálódnak; ugyanez a szűrő-nyelvtan szolgálja ki
+// a számlalistát (/api/invoices) és a dashboardot (/api/dashboard), hogy a
+// két nézet sose térhessen el ugyanazon a szűrőállapoton.
 
 function csv(value: string | null): string[] | undefined {
   return value ? value.split(",").filter(Boolean) : undefined;
@@ -10,9 +10,9 @@ function csv(value: string | null): string[] | undefined {
 
 export function buildInvoiceWhere(params: URLSearchParams): Prisma.InvoiceWhereInput {
   const customerId = params.get("customerId");
-  const meteringPointId = params.get("meteringPointId");
-  const siteIds = csv(params.get("siteIds"));
-  const meteringPointIds = csv(params.get("meteringPointIds"));
+  const measurementPointId = params.get("measurementPointId");
+  const consumptionSiteIds = csv(params.get("consumptionSiteIds"));
+  const measurementPointIds = csv(params.get("measurementPointIds"));
   const energyTypeIds = csv(params.get("energyTypeIds"));
   const provider = params.get("provider");
   const paymentStatus = params.get("paymentStatus");
@@ -22,9 +22,9 @@ export function buildInvoiceWhere(params: URLSearchParams): Prisma.InvoiceWhereI
 
   const where: Prisma.InvoiceWhereInput = {};
   if (customerId) where.customerId = customerId;
-  if (meteringPointId) where.meteringPointId = meteringPointId;
-  if (siteIds) where.siteId = { in: siteIds };
-  if (meteringPointIds) where.meteringPointId = { in: meteringPointIds };
+  if (measurementPointId) where.measurementPointId = measurementPointId;
+  if (consumptionSiteIds) where.consumptionSiteId = { in: consumptionSiteIds };
+  if (measurementPointIds) where.measurementPointId = { in: measurementPointIds };
   if (energyTypeIds) where.energyTypeId = { in: energyTypeIds };
   if (provider) where.providerName = { contains: provider, mode: "insensitive" };
   if (paymentStatus) where.paymentStatus = paymentStatus as Prisma.InvoiceWhereInput["paymentStatus"];
@@ -37,15 +37,15 @@ export function buildInvoiceWhere(params: URLSearchParams): Prisma.InvoiceWhereI
     where.OR = [
       { invoiceNumber: { contains: q, mode: "insensitive" } },
       { meterSerialNumber: { contains: q, mode: "insensitive" } },
-      { meteringPoint: { podCode: { contains: q, mode: "insensitive" } } },
+      { measurementPoint: { podCode: { contains: q, mode: "insensitive" } } },
     ];
   }
   return where;
 }
 
 /** Az aktuálisan szűrt intervallummal azonos hosszúságú, közvetlenül megelőző
- * időszak — a dashboard "előző időszakhoz képest" KPI-jához (SPEC 5.4). Csak
- * akkor számítható, ha a felhasználó explicit dátumintervallumot választott. */
+ * időszak — a dashboard "előző időszakhoz képest" KPI-jához. Csak akkor
+ * számítható, ha a felhasználó explicit dátumintervallumot választott. */
 export function previousPeriodRange(
   periodFrom: string | null,
   periodTo: string | null,

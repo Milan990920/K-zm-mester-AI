@@ -6,27 +6,32 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { INVOICE_TYPE_LABELS } from "@/lib/labels";
 import { computeUnitPrice, computeVatAndGross } from "@/lib/calculations/pricing";
 
+interface Unit {
+  id: string;
+  name: string;
+  kwhPerUnit: number;
+}
 interface EnergyType {
   id: string;
   code: string;
   name: string;
-  allowedUnits: string[];
+  units: Unit[];
 }
-interface MeteringPoint {
+interface MeasurementPoint {
   id: string;
   podCode: string;
   providerName: string | null;
-  energyType: EnergyType;
+  energyType: { id: string; code: string; name: string };
 }
-interface Site {
+interface ConsumptionSite {
   id: string;
   name: string;
-  meteringPoints: MeteringPoint[];
+  measurementPoints: MeasurementPoint[];
 }
 interface CustomerDetail {
   id: string;
   name: string;
-  sites: Site[];
+  consumptionSites: ConsumptionSite[];
 }
 interface CustomerListItem {
   id: string;
@@ -53,8 +58,9 @@ interface ExtractedInvoiceData {
 interface ExtractResponse {
   extracted: ExtractedInvoiceData;
   matchedCustomerId: string | null;
-  matchedSiteId: string | null;
-  matchedMeteringPointId: string | null;
+  matchedConsumptionSiteId: string | null;
+  matchedMeasurementPointId: string | null;
+  matchedUnitId: string | null;
 }
 
 export default function NewInvoicePage() {
@@ -70,13 +76,15 @@ function NewInvoiceForm() {
   const searchParams = useSearchParams();
 
   const [customers, setCustomers] = useState<CustomerListItem[]>([]);
+  const [energyTypes, setEnergyTypes] = useState<EnergyType[]>([]);
   const [customerId, setCustomerId] = useState(searchParams.get("customerId") ?? "");
   const [customerDetail, setCustomerDetail] = useState<CustomerDetail | null>(null);
-  const [siteId, setSiteId] = useState(searchParams.get("siteId") ?? "");
-  const [meteringPointId, setMeteringPointId] = useState(searchParams.get("meteringPointId") ?? "");
-  const [pendingAutoFill, setPendingAutoFill] = useState<{ siteId: string | null; meteringPointId: string | null } | null>(
-    null,
-  );
+  const [consumptionSiteId, setConsumptionSiteId] = useState(searchParams.get("consumptionSiteId") ?? "");
+  const [measurementPointId, setMeasurementPointId] = useState(searchParams.get("measurementPointId") ?? "");
+  const [pendingAutoFill, setPendingAutoFill] = useState<{
+    consumptionSiteId: string | null;
+    measurementPointId: string | null;
+  } | null>(null);
 
   const [providerName, setProviderName] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -85,7 +93,7 @@ function NewInvoiceForm() {
   const [periodEnd, setPeriodEnd] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [quantity, setQuantity] = useState("");
-  const [unit, setUnit] = useState("");
+  const [unitId, setUnitId] = useState("");
   const [meterSerialNumber, setMeterSerialNumber] = useState("");
   const [netAmount, setNetAmount] = useState("");
   const [vatRate, setVatRate] = useState("27");
@@ -111,6 +119,9 @@ function NewInvoiceForm() {
 
   useEffect(() => {
     reloadCustomers();
+    fetch("/api/energy-types")
+      .then((res) => res.json())
+      .then(setEnergyTypes);
   }, []);
 
   useEffect(() => {
@@ -125,19 +136,23 @@ function NewInvoiceForm() {
 
   useEffect(() => {
     if (customerDetail && pendingAutoFill) {
-      if (pendingAutoFill.siteId) setSiteId(pendingAutoFill.siteId);
-      if (pendingAutoFill.meteringPointId) setMeteringPointId(pendingAutoFill.meteringPointId);
+      if (pendingAutoFill.consumptionSiteId) setConsumptionSiteId(pendingAutoFill.consumptionSiteId);
+      if (pendingAutoFill.measurementPointId) setMeasurementPointId(pendingAutoFill.measurementPointId);
       setPendingAutoFill(null);
     }
   }, [customerDetail, pendingAutoFill]);
 
-  const site = customerDetail?.sites.find((s) => s.id === siteId) ?? null;
-  const meteringPoint = site?.meteringPoints.find((mp) => mp.id === meteringPointId) ?? null;
+  const consumptionSite = customerDetail?.consumptionSites.find((s) => s.id === consumptionSiteId) ?? null;
+  const measurementPoint = consumptionSite?.measurementPoints.find((mp) => mp.id === measurementPointId) ?? null;
+  const availableUnits = useMemo(
+    () => energyTypes.find((et) => et.id === measurementPoint?.energyType.id)?.units ?? [],
+    [energyTypes, measurementPoint],
+  );
 
   useEffect(() => {
-    if (meteringPoint?.providerName && !providerName) setProviderName(meteringPoint.providerName);
+    if (measurementPoint?.providerName && !providerName) setProviderName(measurementPoint.providerName);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meteringPoint]);
+  }, [measurementPoint]);
 
   // A PDF-ből felismert bruttó összeg a számlán szereplő pontos érték —
   // ha ez rendelkezésre áll, ne írja felül a nettó×áfa-ból visszaszámolt
@@ -158,6 +173,7 @@ function NewInvoiceForm() {
     }
   }, [netAmount, vatRate]);
 
+  const selectedUnit = availableUnits.find((u) => u.id === unitId);
   const computedUnitPrice = useMemo(() => {
     const gross = Number(grossAmount);
     const qty = Number(quantity);
@@ -190,7 +206,7 @@ function NewInvoiceForm() {
       if (ex.periodEnd) setPeriodEnd(ex.periodEnd);
       if (ex.dueDate) setDueDate(ex.dueDate);
       if (ex.quantity !== null) setQuantity(String(ex.quantity));
-      if (ex.unit) setUnit(ex.unit);
+      if (data.matchedUnitId) setUnitId(data.matchedUnitId);
       if (ex.grossAmount !== null) {
         // A számlán szereplő pontos bruttó (és abból a pontos áfa) értéket
         // használjuk, nem a nettó×áfa-ból visszaszámolt, kerekítő verziót.
@@ -205,7 +221,10 @@ function NewInvoiceForm() {
 
       if (data.matchedCustomerId) {
         setCustomerId(data.matchedCustomerId);
-        setPendingAutoFill({ siteId: data.matchedSiteId, meteringPointId: data.matchedMeteringPointId });
+        setPendingAutoFill({
+          consumptionSiteId: data.matchedConsumptionSiteId,
+          measurementPointId: data.matchedMeasurementPointId,
+        });
       }
     } finally {
       setIsExtracting(false);
@@ -220,9 +239,9 @@ function NewInvoiceForm() {
       const formData = new FormData();
       const fields: Record<string, string> = {
         customerId,
-        siteId,
-        meteringPointId,
-        energyTypeId: meteringPoint?.energyType.id ?? "",
+        consumptionSiteId,
+        measurementPointId,
+        energyTypeId: measurementPoint?.energyType.id ?? "",
         providerName,
         invoiceNumber,
         issueDate,
@@ -230,7 +249,7 @@ function NewInvoiceForm() {
         periodEnd,
         dueDate,
         quantity,
-        unit,
+        unitId,
         meterSerialNumber,
         netAmount,
         vatRate,
@@ -340,8 +359,8 @@ function NewInvoiceForm() {
               value={customerId}
               onChange={(e) => {
                 setCustomerId(e.target.value);
-                setSiteId("");
-                setMeteringPointId("");
+                setConsumptionSiteId("");
+                setMeasurementPointId("");
               }}
               className="field-select"
             >
@@ -356,16 +375,16 @@ function NewInvoiceForm() {
           <div>
             <label className="field-label">Fogyasztási hely</label>
             <select
-              value={siteId}
+              value={consumptionSiteId}
               onChange={(e) => {
-                setSiteId(e.target.value);
-                setMeteringPointId("");
+                setConsumptionSiteId(e.target.value);
+                setMeasurementPointId("");
               }}
               disabled={!customerDetail}
               className="field-select"
             >
               <option value="">Válassz…</option>
-              {customerDetail?.sites.map((s) => (
+              {customerDetail?.consumptionSites.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
@@ -375,13 +394,13 @@ function NewInvoiceForm() {
           <div>
             <label className="field-label">Mérési pont (POD)</label>
             <select
-              value={meteringPointId}
-              onChange={(e) => setMeteringPointId(e.target.value)}
-              disabled={!site}
+              value={measurementPointId}
+              onChange={(e) => setMeasurementPointId(e.target.value)}
+              disabled={!consumptionSite}
               className="field-select font-mono text-[13px]"
             >
               <option value="">Válassz…</option>
-              {site?.meteringPoints.map((mp) => (
+              {consumptionSite?.measurementPoints.map((mp) => (
                 <option key={mp.id} value={mp.id}>
                   {mp.podCode}
                 </option>
@@ -389,9 +408,9 @@ function NewInvoiceForm() {
             </select>
           </div>
         </div>
-        {meteringPoint && (
+        {measurementPoint && (
           <p className="mt-3 text-xs text-muted">
-            Energianem: <span className="text-ink">{meteringPoint.energyType.name}</span> — csak ehhez
+            Energianem: <span className="text-ink">{measurementPoint.energyType.name}</span> — csak ehhez
             tartozó mértékegység adható meg.
           </p>
         )}
@@ -457,19 +476,19 @@ function NewInvoiceForm() {
           <div>
             <label className="field-label">Mértékegység</label>
             <select
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              disabled={!meteringPoint}
+              value={unitId}
+              onChange={(e) => setUnitId(e.target.value)}
+              disabled={!measurementPoint}
               className="field-select"
             >
               <option value="">Válassz…</option>
-              {meteringPoint?.energyType.allowedUnits.map((u) => (
-                <option key={u} value={u}>
-                  {u}
+              {availableUnits.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
                 </option>
               ))}
             </select>
-            {firstError("unit") && <FieldError message={firstError("unit")!} />}
+            {firstError("unitId") && <FieldError message={firstError("unitId")!} />}
           </div>
         </div>
 
@@ -549,7 +568,9 @@ function NewInvoiceForm() {
           <div>
             <label className="field-label">Számolt egységár</label>
             <p className="field-input flex items-center bg-bg font-mono text-muted">
-              {computedUnitPrice !== null ? `${computedUnitPrice} ${currency}/${unit || "egység"}` : "—"}
+              {computedUnitPrice !== null
+                ? `${computedUnitPrice} ${currency}/${selectedUnit?.name ?? "egység"}`
+                : "—"}
             </p>
           </div>
         </div>

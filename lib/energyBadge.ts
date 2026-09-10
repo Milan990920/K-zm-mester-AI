@@ -7,6 +7,7 @@ export const ENERGY_BADGE_CLASSES: Record<string, string> = {
   water: "bg-energy-water/10 text-energy-water",
   sewage: "bg-energy-sewage/10 text-energy-sewage",
   fuel: "bg-energy-fuel/10 text-energy-fuel",
+  wood_chips: "bg-energy-wood_chips/10 text-energy-wood_chips",
 };
 
 export function energyBadgeClass(code: string): string {
@@ -23,6 +24,7 @@ export const ENERGY_HEX_COLORS: Record<string, string> = {
   water: "#2E8F92",
   sewage: "#5C6B63",
   fuel: "#6B4F8A",
+  wood_chips: "#6B8F4E",
 };
 
 export function energyHexColor(code: string): string {

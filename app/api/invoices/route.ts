@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const invoices = await prisma.invoice.findMany({
     where,
     orderBy: { issueDate: "desc" },
-    include: { customer: true, site: true, meteringPoint: true, energyType: true },
+    include: { customer: true, consumptionSite: true, measurementPoint: true, energyType: true, unit: true },
   });
   return NextResponse.json(invoices);
 }
@@ -23,21 +23,21 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const payload = formDataToInvoicePayload(formData);
 
-  let allowedUnits: string[] | null = null;
+  let allowedUnitIds: string[] | null = null;
   if (payload.energyTypeId) {
-    const energyType = await prisma.energyType.findUnique({ where: { id: payload.energyTypeId as string } });
-    allowedUnits = energyType?.allowedUnits ?? null;
+    const units = await prisma.unit.findMany({ where: { energyTypeId: payload.energyTypeId as string } });
+    allowedUnitIds = units.map((u) => u.id);
   }
 
-  const parsed = buildInvoiceSchema(allowedUnits).safeParse(payload);
+  const parsed = buildInvoiceSchema(allowedUnitIds).safeParse(payload);
   if (!parsed.success) {
     return NextResponse.json({ errors: parsed.error.flatten().fieldErrors }, { status: 422 });
   }
   const data = parsed.data;
 
-  // SPEC.md 3.1 — a bruttó összeg és az egységár számolható, ha nincs
-  // kézzel megadva; csak akkor számolunk, ha a hozzávaló mezők megvannak
-  // (piszkozatnál ez nem garantált).
+  // A bruttó összeg és az egységár számolható, ha nincs kézzel megadva; csak
+  // akkor számolunk, ha a hozzávaló mezők megvannak (piszkozatnál ez nem
+  // garantált).
   let netAmount = data.netAmount ?? undefined;
   let vatAmount = data.vatAmount ?? undefined;
   let grossAmount = data.grossAmount ?? undefined;
@@ -50,9 +50,9 @@ export async function POST(request: NextRequest) {
     data.unitPrice ?? (grossAmount !== undefined && data.quantity ? computeUnitPrice(grossAmount, data.quantity) : null);
 
   let warnings: string[] = [];
-  if (data.meteringPointId && data.providerName && data.invoiceNumber && data.periodStart && data.periodEnd) {
+  if (data.measurementPointId && data.providerName && data.invoiceNumber && data.periodStart && data.periodEnd) {
     const existing = await prisma.invoice.findMany({
-      where: { meteringPointId: data.meteringPointId, providerName: data.providerName },
+      where: { measurementPointId: data.measurementPointId, providerName: data.providerName },
       select: { id: true, invoiceNumber: true, periodStart: true, periodEnd: true },
     });
     warnings = findDuplicateWarnings(
@@ -77,8 +77,8 @@ export async function POST(request: NextRequest) {
   const invoice = await prisma.invoice.create({
     data: {
       customerId: data.customerId!,
-      siteId: data.siteId!,
-      meteringPointId: data.meteringPointId!,
+      consumptionSiteId: data.consumptionSiteId!,
+      measurementPointId: data.measurementPointId!,
       energyTypeId: data.energyTypeId!,
       providerName: data.providerName ?? "",
       invoiceNumber: data.invoiceNumber ?? "",
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       periodEnd: data.periodEnd ?? new Date(),
       dueDate: data.dueDate,
       quantity: data.quantity ?? 0,
-      unit: data.unit ?? "",
+      unitId: data.unitId!,
       meterSerialNumber: data.meterSerialNumber,
       netAmount: netAmount ?? 0,
       vatRate: data.vatRate ?? 0,

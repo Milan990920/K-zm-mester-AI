@@ -7,7 +7,7 @@ interface CustomerListItem {
   id: string;
   name: string;
   taxNumber: string | null;
-  _count: { sites: number; invoices: number };
+  _count: { consumptionSites: number; invoices: number };
 }
 
 export default function CustomerSelectorPage() {
@@ -104,7 +104,7 @@ export default function CustomerSelectorPage() {
                 </div>
                 <div className="flex items-center gap-5 text-xs text-muted">
                   <span>
-                    <span className="font-mono text-[13px] text-ink">{customer._count.sites}</span>{" "}
+                    <span className="font-mono text-[13px] text-ink">{customer._count.consumptionSites}</span>{" "}
                     fogyasztási hely
                   </span>
                   <span>

@@ -1,5 +1,50 @@
 # Számlamenedzsment platform — fejlesztési specifikáció
 
+## 0. FONTOS — a rendszer a Nyugat-dunántúli Vízügyi Igazgatóságra (NYUDUVIZIG) van szabva
+
+Az eredeti terv alább egy általános, több ügyfeles számlamenedzsment SaaS volt.
+A felhasználó a felület kipróbálása közben úgy döntött, hogy a rendszert
+**kizárólag a Nyugat-dunántúli Vízügyi Igazgatóság energetikai szakreferensi
+jelentéséhez** szabja — a feltöltött valós "Szakreferens alaptáblázat
+NYUDUVIZIG 2026.xlsx" táblázat és MVM/E.ON/VASIVÍZ mintaszámlák alapján.
+
+**Ami emiatt megváltozott az alább leírt tervhez képest:**
+
+- **Adatmodell átnevezve/bővítve**: `Site` → `ConsumptionSite` (+ `category`:
+  `BUILDING`/`ACTIVITY`/`TRANSPORT` — "Épület"/"Tevékenység"/"Szállítás", az
+  excel "összesítő" fülének megfelelően), `MeteringPoint` → `MeasurementPoint`
+  (+ `measurementType`: `TIME_SERIES`/`PROFILE` — "idősoros"/"profilos", +
+  `status` az `isActive` helyett). `EnergyType.allowedUnits` (string tömb)
+  helyett önálló `Unit` tábla (`energyTypeId`, `name`, `kwhPerUnit` — kWh-
+  átváltási tényező), és új `CO2Factor` tábla (`energyTypeId`, `year`,
+  `kgCo2PerKwh` — évenként verziózva). `Invoice.unit` (szabad szöveg) helyett
+  `Invoice.unitId` (FK a `Unit`-ra). `Customer` kibővítve szakreferensi
+  mezőkkel (`specialistName`, `specialistQualification`,
+  `certificateIssuer`, `certificateNumber`, `serviceCompanyName/Address/
+  TaxNumber`, `relationshipStartDate`).
+- **Energianem-készlet a valós excel alapján**: villamos energia, földgáz,
+  faapríték, üzemanyag (liter benzin / liter gázolaj két külön `Unit`-ként).
+  **Víz/csatorna szándékosan nincs seedelve** — a szakreferensi
+  energiajelentés (2015. évi LVII. tv.) kWh-ban kifejezhető
+  energiahordozókra vonatkozik, a víznek nincs értelmes kg CO2/kWh
+  tényezője. Az `EnergyType` tábla admin-szerkeszthető, bővíthető.
+- **Dashboard CO2-KPI-val**: összes CO2-kibocsátás (kg) + kategória szerinti
+  (Épület/Tevékenység/Szállítás) bontás grafikonon, a `/api/dashboard`
+  végpontban a `quantity × Unit.kwhPerUnit × CO2Factor.kgCo2PerKwh`
+  számítással (csak akkor pontos, ha a CO2-tényező az adott évre fel van
+  véve — ha hiányzik, a KPI jelzi).
+- **Seed valós adatokkal**: a "Nyugat-dunántúli Vízügyi Igazgatóság" ügyfél
+  (adószám 15308421-2-18) + az excel "Villamos energia"/"Földgáz"
+  szakaszaiban felsorolt, valós POD-kódú telephelyek — ld.
+  `prisma/seed.ts` fejlécében a részletes forrás- és megbízhatósági jegyzetet
+  (a telephelynevek a POD-kódokból kiolvasott közelítések, nem hivatalos
+  névjegyzék).
+- Az alább következő eredeti terv (1–9. pont) a **még mindig érvényes**
+  architektúrát, design-rendszert és validációs szabályokat írja le — csak
+  az entitásnevek/mezők és az energianem-készlet változott a fentiek szerint.
+
+---
+
 > **Hogyan használd:** illeszd be ezt a dokumentumot első üzenetként a Claude Code-ba (a GitHub-repóval összekötve), vagy commitold a repó gyökerébe `SPEC.md` néven, és kérd meg: *"Olvasd el a SPEC.md-t, és valósítsd meg lépésről lépésre a 8. pont sorrendjében."* Ez a fájl egy önálló energiaszámla-kezelő webalkalmazás teljes specifikációja — a középpontban a számlamenedzsment (adatmegjelenítés, szűrés, tárolás, dashboard) áll.
 >
 > A projekt felépülése után érdemes a Claude Code `/init` parancsával egy külön, rövid (200 sor alatti) `CLAUDE.md`-t generáltatni a kialakult build-parancsokból és konvenciókból — ez a dokumentum egy egyszeri, részletes build-specifikáció, nem az a fajta rövid, örökös projekt-memória, amit a `CLAUDE.md`-nek szánnak.

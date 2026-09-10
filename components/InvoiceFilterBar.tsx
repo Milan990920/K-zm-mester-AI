@@ -15,17 +15,20 @@ function QuickRangeButton({ label, onClick }: { label: string; onClick: () => vo
   );
 }
 
-// SPEC.md 5.2 — "Fogyasztási hely → POD → energianem szerint szűkíthető
-// almenü/szűrő, ebben a sorrendben." Ugyanez a szűrősáv szolgálja ki a
-// számlalistát és a dashboardot is (5.4: "ugyanazok a szűrők"), a szűrőállapot
-// mindkét oldalon az aktuális útvonal query-stringjében él.
+// "Fogyasztási hely → POD → energianem szerint szűkíthető almenü/szűrő,
+// ebben a sorrendben." Ugyanez a szűrősáv szolgálja ki a számlalistát és a
+// dashboardot is, a szűrőállapot mindkét oldalon az aktuális útvonal
+// query-stringjében él.
 export function InvoiceFilterBar({ customer }: { customer: CustomerDetail }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const siteIds = useMemo(() => searchParams.get("siteIds")?.split(",").filter(Boolean) ?? [], [searchParams]);
-  const meteringPointId = searchParams.get("meteringPointId") ?? "";
+  const consumptionSiteIds = useMemo(
+    () => searchParams.get("consumptionSiteIds")?.split(",").filter(Boolean) ?? [],
+    [searchParams],
+  );
+  const measurementPointId = searchParams.get("measurementPointId") ?? "";
   const energyTypeIds = useMemo(
     () => searchParams.get("energyTypeIds")?.split(",").filter(Boolean) ?? [],
     [searchParams],
@@ -47,24 +50,33 @@ export function InvoiceFilterBar({ customer }: { customer: CustomerDetail }) {
 
   const allEnergyTypes = useMemo(() => {
     const map = new Map<string, EnergyType>();
-    customer.sites.forEach((site) => site.meteringPoints.forEach((mp) => map.set(mp.energyType.id, mp.energyType)));
+    customer.consumptionSites.forEach((site) =>
+      site.measurementPoints.forEach((mp) => map.set(mp.energyType.id, mp.energyType)),
+    );
     return Array.from(map.values());
   }, [customer]);
 
-  const availableMeteringPoints = useMemo(() => {
-    const sites = siteIds.length > 0 ? customer.sites.filter((s) => siteIds.includes(s.id)) : customer.sites;
-    return sites.flatMap((site) => site.meteringPoints.map((mp) => ({ ...mp, siteName: site.name })));
-  }, [customer, siteIds]);
+  const availableMeasurementPoints = useMemo(() => {
+    const sites =
+      consumptionSiteIds.length > 0
+        ? customer.consumptionSites.filter((s) => consumptionSiteIds.includes(s.id))
+        : customer.consumptionSites;
+    return sites.flatMap((site) => site.measurementPoints.map((mp) => ({ ...mp, siteName: site.name })));
+  }, [customer, consumptionSiteIds]);
 
   const providers = useMemo(() => {
     const set = new Set<string>();
-    customer.sites.forEach((site) => site.meteringPoints.forEach((mp) => mp.providerName && set.add(mp.providerName)));
+    customer.consumptionSites.forEach((site) =>
+      site.measurementPoints.forEach((mp) => mp.providerName && set.add(mp.providerName)),
+    );
     return Array.from(set);
   }, [customer]);
 
   function toggleSite(siteId: string) {
-    const next = siteIds.includes(siteId) ? siteIds.filter((id) => id !== siteId) : [...siteIds, siteId];
-    updateParams({ siteIds: next.join(","), meteringPointId: null });
+    const next = consumptionSiteIds.includes(siteId)
+      ? consumptionSiteIds.filter((id) => id !== siteId)
+      : [...consumptionSiteIds, siteId];
+    updateParams({ consumptionSiteIds: next.join(","), measurementPointId: null });
   }
 
   function toggleEnergyType(id: string) {
@@ -77,8 +89,8 @@ export function InvoiceFilterBar({ customer }: { customer: CustomerDetail }) {
   }
 
   const hasActiveFilters =
-    siteIds.length > 0 ||
-    !!meteringPointId ||
+    consumptionSiteIds.length > 0 ||
+    !!measurementPointId ||
     energyTypeIds.length > 0 ||
     !!provider ||
     !!paymentStatus ||
@@ -88,17 +100,17 @@ export function InvoiceFilterBar({ customer }: { customer: CustomerDetail }) {
 
   return (
     <div className="surface mb-6 flex flex-col gap-5 p-5">
-      {customer.sites.length > 0 && (
+      {customer.consumptionSites.length > 0 && (
         <div>
           <p className="field-label mb-2">Fogyasztási hely</p>
           <div className="flex flex-wrap gap-2">
-            {customer.sites.map((site) => (
+            {customer.consumptionSites.map((site) => (
               <button
                 key={site.id}
                 type="button"
                 onClick={() => toggleSite(site.id)}
                 className={`badge border transition-colors ${
-                  siteIds.includes(site.id)
+                  consumptionSiteIds.includes(site.id)
                     ? "border-brass bg-brass/10 text-brass"
                     : "border-border bg-white text-muted hover:text-ink"
                 }`}
@@ -114,12 +126,12 @@ export function InvoiceFilterBar({ customer }: { customer: CustomerDetail }) {
         <div>
           <label className="field-label">POD</label>
           <select
-            value={meteringPointId}
-            onChange={(e) => updateParams({ meteringPointId: e.target.value || null })}
+            value={measurementPointId}
+            onChange={(e) => updateParams({ measurementPointId: e.target.value || null })}
             className="field-select font-mono text-[13px]"
           >
             <option value="">Összes</option>
-            {availableMeteringPoints.map((mp) => (
+            {availableMeasurementPoints.map((mp) => (
               <option key={mp.id} value={mp.id}>
                 {mp.podCode}
               </option>

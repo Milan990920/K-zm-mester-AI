@@ -8,10 +8,10 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
   const customer = await prisma.customer.findUnique({
     where: { id: params.id },
     include: {
-      sites: {
+      consumptionSites: {
         orderBy: { name: "asc" },
         include: {
-          meteringPoints: {
+          measurementPoints: {
             orderBy: { podCode: "asc" },
             include: { energyType: true },
           },

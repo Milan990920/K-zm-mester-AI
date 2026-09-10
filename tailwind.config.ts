@@ -20,6 +20,7 @@ const config: Config = {
           water: "#2E8F92",
           sewage: "#5C6B63",
           fuel: "#6B4F8A",
+          wood_chips: "#6B8F4E",
         },
       },
       fontFamily: {

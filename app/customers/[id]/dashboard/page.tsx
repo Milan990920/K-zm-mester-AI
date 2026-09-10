@@ -26,11 +26,14 @@ interface DashboardData {
   invoiceCount: number;
   totalGross: number;
   totalNet: number;
+  totalCo2Kg: number;
+  co2FactorMissing: boolean;
   pctChange: number | null;
   quantityByEnergyType: { energyTypeCode: string; energyTypeName: string; unit: string; quantity: number }[];
   avgUnitPriceByEnergyType: { energyTypeCode: string; energyTypeName: string; unit: string; avgUnitPrice: number }[];
   costByEnergyType: { energyTypeCode: string; energyTypeName: string; total: number }[];
   costBySite: { siteName: string; total: number }[];
+  byCategory: { category: string; label: string; kwh: number; co2Kg: number; costGross: number }[];
   monthlyTrend: { month: string; total: number }[];
   heatmap: { month: string; siteId: string; siteName: string; total: number }[];
 }
@@ -41,16 +44,16 @@ interface ExportRow {
   periodStart: string;
   periodEnd: string;
   quantity: number;
-  unit: string;
   meterSerialNumber: string | null;
   netAmount: number;
   grossAmount: number;
   currency: string;
   paymentStatus: string;
   customer: { name: string };
-  site: { name: string };
-  meteringPoint: { podCode: string };
+  consumptionSite: { name: string };
+  measurementPoint: { podCode: string };
   energyType: { name: string };
+  unit: { name: string };
 }
 
 function StatCard({ label, children }: { label: string; children: React.ReactNode }) {
@@ -179,15 +182,15 @@ function DashboardView() {
       ];
       const rows = invoices.map((inv) => [
         inv.customer.name,
-        inv.site.name,
-        inv.meteringPoint.podCode,
+        inv.consumptionSite.name,
+        inv.measurementPoint.podCode,
         inv.meterSerialNumber ?? "",
         inv.providerName,
         inv.energyType.name,
         inv.periodStart.slice(0, 10),
         inv.periodEnd.slice(0, 10),
         String(inv.quantity),
-        inv.unit,
+        inv.unit.name,
         String(inv.netAmount),
         String(inv.grossAmount),
         inv.currency,
@@ -267,6 +270,17 @@ function DashboardView() {
             <StatCard label="Számlák száma">
               <p className="font-sans text-[32px] font-semibold leading-tight text-ink">{data.invoiceCount}</p>
               <p className="text-sm text-muted">a jelenlegi szűrésnek megfelelően</p>
+            </StatCard>
+
+            <StatCard label="CO2-kibocsátás">
+              <p className="font-sans text-[32px] font-semibold leading-tight text-ink">
+                {groupThousands(Math.round(data.totalCo2Kg))} kg
+              </p>
+              <p className="text-sm text-muted">
+                {data.co2FactorMissing
+                  ? "egyes energianemekhez nincs megadva CO2-tényező — hiányos"
+                  : "a jelenlegi szűrésnek megfelelően"}
+              </p>
             </StatCard>
 
             <StatCard label="Fogyasztás energianem szerint">
@@ -399,6 +413,41 @@ function DashboardView() {
                     cursor={{ fill: "rgba(30,36,34,0.04)" }}
                   />
                   <Bar dataKey="total" fill="#B8863B" radius={[4, 4, 0, 0]} maxBarSize={48} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+
+            <ChartCard title="CO2-kibocsátás kategória szerint (Épület / Tevékenység / Szállítás)">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.byCategory} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+                  <CartesianGrid vertical={false} stroke="#E4E8E1" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#5C6B63" }} axisLine={{ stroke: "#E4E8E1" }} tickLine={false} />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "#5C6B63" }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v: number) => groupThousands(Math.round(v))}
+                    width={64}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload || payload.length === 0) return null;
+                      const row = payload[0]?.payload as { kwh: number; co2Kg: number } | undefined;
+                      return (
+                        <div className="surface px-3 py-2 shadow-lg">
+                          <p className="mb-0.5 text-xs text-muted">{label}</p>
+                          <p className="font-mono text-[13px] font-semibold text-ink">
+                            {groupThousands(Math.round(row?.co2Kg ?? 0))} kg CO2
+                          </p>
+                          <p className="font-mono text-[12px] text-muted">
+                            {groupThousands(Math.round(row?.kwh ?? 0))} kWh
+                          </p>
+                        </div>
+                      );
+                    }}
+                    cursor={{ fill: "rgba(30,36,34,0.04)" }}
+                  />
+                  <Bar dataKey="co2Kg" fill="#6B8F4E" radius={[4, 4, 0, 0]} maxBarSize={64} />
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>

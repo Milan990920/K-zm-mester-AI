@@ -12,24 +12,35 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const where = buildInvoiceWhere(params);
 
-  const invoices = await prisma.invoice.findMany({
-    where,
-    select: {
-      grossAmount: true,
-      netAmount: true,
-      currency: true,
-      quantity: true,
-      unit: true,
-      unitPrice: true,
-      periodStart: true,
-      site: { select: { id: true, name: true } },
-      energyType: { select: { id: true, code: true, name: true } },
-    },
-  });
+  const [invoices, co2Factors] = await Promise.all([
+    prisma.invoice.findMany({
+      where,
+      select: {
+        grossAmount: true,
+        netAmount: true,
+        currency: true,
+        quantity: true,
+        unitPrice: true,
+        periodStart: true,
+        unit: { select: { name: true, kwhPerUnit: true } },
+        consumptionSite: { select: { id: true, name: true, category: true } },
+        energyType: { select: { id: true, code: true, name: true } },
+      },
+    }),
+    prisma.cO2Factor.findMany({ select: { energyTypeId: true, year: true, kgCo2PerKwh: true } }),
+  ]);
+
+  const co2FactorByKey = new Map<string, number>();
+  co2Factors.forEach((f) => co2FactorByKey.set(`${f.energyTypeId}::${f.year}`, f.kgCo2PerKwh));
+
+  function co2KgFor(inv: (typeof invoices)[number]): number | null {
+    const factor = co2FactorByKey.get(`${inv.energyType.id}::${inv.periodStart.getFullYear()}`);
+    if (factor === undefined) return null;
+    return inv.quantity * inv.unit.kwhPerUnit * factor;
+  }
 
   // Domináns pénznem — a szűrt számlák többsége milyen pénznemben van; csak
-  // ennek megfelelő tételeket összegezzük. A SPEC.md nem definiál
-  // multi-currency összesítést, ezt a gyakorlatban egy ügyfélnél sem várjuk.
+  // ennek megfelelő tételeket összegezzük.
   const currencyCounts = new Map<string, number>();
   invoices.forEach((inv) => currencyCounts.set(inv.currency, (currencyCounts.get(inv.currency) ?? 0) + 1));
   const currency = Array.from(currencyCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "HUF";
@@ -38,21 +49,29 @@ export async function GET(request: NextRequest) {
   const totalGross = inCurrency.reduce((sum, inv) => sum + inv.grossAmount, 0);
   const totalNet = inCurrency.reduce((sum, inv) => sum + inv.netAmount, 0);
 
+  let totalCo2Kg = 0;
+  let co2FactorMissing = false;
+  invoices.forEach((inv) => {
+    const kg = co2KgFor(inv);
+    if (kg === null) co2FactorMissing = true;
+    else totalCo2Kg += kg;
+  });
+
   // Fogyasztás energianem + mértékegység szerint — sose összegezzünk különböző
-  // mértékegységeket egyetlen számmá (SPEC.md 5.3/5.4).
+  // mértékegységeket egyetlen számmá.
   const quantityMap = new Map<
     string,
     { energyTypeCode: string; energyTypeName: string; unit: string; quantity: number }
   >();
   invoices.forEach((inv) => {
-    const key = `${inv.energyType.id}::${inv.unit}`;
+    const key = `${inv.energyType.id}::${inv.unit.name}`;
     const existing = quantityMap.get(key);
     if (existing) existing.quantity += inv.quantity;
     else
       quantityMap.set(key, {
         energyTypeCode: inv.energyType.code,
         energyTypeName: inv.energyType.name,
-        unit: inv.unit,
+        unit: inv.unit.name,
         quantity: inv.quantity,
       });
   });
@@ -63,7 +82,7 @@ export async function GET(request: NextRequest) {
   >();
   invoices.forEach((inv) => {
     if (inv.unitPrice === null) return;
-    const key = `${inv.energyType.id}::${inv.unit}`;
+    const key = `${inv.energyType.id}::${inv.unit.name}`;
     const existing = unitPriceAgg.get(key);
     if (existing) {
       existing.sum += inv.unitPrice;
@@ -72,7 +91,7 @@ export async function GET(request: NextRequest) {
       unitPriceAgg.set(key, {
         energyTypeCode: inv.energyType.code,
         energyTypeName: inv.energyType.name,
-        unit: inv.unit,
+        unit: inv.unit.name,
         sum: inv.unitPrice,
         count: 1,
       });
@@ -93,9 +112,30 @@ export async function GET(request: NextRequest) {
 
   const costBySiteMap = new Map<string, { siteName: string; total: number }>();
   inCurrency.forEach((inv) => {
-    const existing = costBySiteMap.get(inv.site.id);
+    const existing = costBySiteMap.get(inv.consumptionSite.id);
     if (existing) existing.total += inv.grossAmount;
-    else costBySiteMap.set(inv.site.id, { siteName: inv.site.name, total: inv.grossAmount });
+    else costBySiteMap.set(inv.consumptionSite.id, { siteName: inv.consumptionSite.name, total: inv.grossAmount });
+  });
+
+  // Kategória szerinti bontás (Épület / Tevékenység / Szállítás) — a
+  // NYUDUVIZIG "összesítő" táblázatának megfelelően, energia mennyiség
+  // (kWh-ra átszámítva) és CO2 szerint is.
+  const categoryLabels: Record<string, string> = { BUILDING: "Épületek", ACTIVITY: "Tevékenység", TRANSPORT: "Szállítás" };
+  const categoryMap = new Map<string, { category: string; label: string; kwh: number; co2Kg: number; costGross: number }>();
+  invoices.forEach((inv) => {
+    const category = inv.consumptionSite.category;
+    const existing = categoryMap.get(category) ?? {
+      category,
+      label: categoryLabels[category] ?? category,
+      kwh: 0,
+      co2Kg: 0,
+      costGross: 0,
+    };
+    existing.kwh += inv.quantity * inv.unit.kwhPerUnit;
+    const kg = co2KgFor(inv);
+    if (kg !== null) existing.co2Kg += kg;
+    if (inv.currency === currency) existing.costGross += inv.grossAmount;
+    categoryMap.set(category, existing);
   });
 
   const monthlyTrendMap = new Map<string, number>();
@@ -110,14 +150,20 @@ export async function GET(request: NextRequest) {
   const heatmapMap = new Map<string, { month: string; siteId: string; siteName: string; total: number }>();
   inCurrency.forEach((inv) => {
     const month = monthKey(inv.periodStart);
-    const key = `${month}::${inv.site.id}`;
+    const key = `${month}::${inv.consumptionSite.id}`;
     const existing = heatmapMap.get(key);
     if (existing) existing.total += inv.grossAmount;
-    else heatmapMap.set(key, { month, siteId: inv.site.id, siteName: inv.site.name, total: inv.grossAmount });
+    else
+      heatmapMap.set(key, {
+        month,
+        siteId: inv.consumptionSite.id,
+        siteName: inv.consumptionSite.name,
+        total: inv.grossAmount,
+      });
   });
 
   // Előző, azonos hosszúságú időszak — csak akkor számítható, ha a
-  // felhasználó explicit dátumintervallumot állított be (SPEC.md 5.4).
+  // felhasználó explicit dátumintervallumot állított be.
   const previous = previousPeriodRange(params.get("periodFrom"), params.get("periodTo"));
   let pctChange: number | null = null;
   if (previous) {
@@ -136,6 +182,8 @@ export async function GET(request: NextRequest) {
     invoiceCount: invoices.length,
     totalGross,
     totalNet,
+    totalCo2Kg,
+    co2FactorMissing,
     pctChange,
     quantityByEnergyType: Array.from(quantityMap.values()),
     avgUnitPriceByEnergyType: Array.from(unitPriceAgg.values()).map((v) => ({
@@ -146,6 +194,7 @@ export async function GET(request: NextRequest) {
     })),
     costByEnergyType: Array.from(costByEnergyTypeMap.values()),
     costBySite: Array.from(costBySiteMap.values()),
+    byCategory: Array.from(categoryMap.values()),
     monthlyTrend,
     heatmap: Array.from(heatmapMap.values()),
   });

@@ -16,7 +16,6 @@ interface InvoiceDetail {
   periodEnd: string;
   dueDate: string | null;
   quantity: number;
-  unit: string;
   meterSerialNumber: string | null;
   netAmount: number;
   vatRate: number;
@@ -29,9 +28,10 @@ interface InvoiceDetail {
   attachmentPath: string | null;
   isDraft: boolean;
   customer: { id: string; name: string };
-  site: { id: string; name: string; address: string };
-  meteringPoint: { id: string; podCode: string };
+  consumptionSite: { id: string; name: string; address: string | null };
+  measurementPoint: { id: string; podCode: string };
   energyType: { code: string; name: string };
+  unit: { name: string };
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -69,7 +69,7 @@ export default function InvoiceDetailPage() {
 
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <p className="eyebrow mb-2">{invoice.site.name}</p>
+          <p className="eyebrow mb-2">{invoice.consumptionSite.name}</p>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">
             {invoice.invoiceNumber}
           </h1>
@@ -86,11 +86,11 @@ export default function InvoiceDetailPage() {
       <div className="grid grid-cols-2 gap-5">
         <div className="surface flex flex-col gap-4 p-6">
           <Field label="Szolgáltató">{invoice.providerName}</Field>
-          <Field label="Mérési pont (POD)">{invoice.meteringPoint.podCode}</Field>
+          <Field label="Mérési pont (POD)">{invoice.measurementPoint.podCode}</Field>
           <Field label="Számlázási időszak">{formatPeriod(new Date(invoice.periodStart), new Date(invoice.periodEnd))}</Field>
           <Field label="Kiállítás dátuma">{invoice.issueDate.slice(0, 10)}</Field>
           {invoice.dueDate && <Field label="Fizetési határidő">{invoice.dueDate.slice(0, 10)}</Field>}
-          <Field label="Fogyasztott mennyiség">{formatQuantity(invoice.quantity, invoice.unit)}</Field>
+          <Field label="Fogyasztott mennyiség">{formatQuantity(invoice.quantity, invoice.unit.name)}</Field>
           {invoice.meterSerialNumber && (
             <Field label="Mérőóra gyári szám">{invoice.meterSerialNumber}</Field>
           )}
@@ -103,7 +103,7 @@ export default function InvoiceDetailPage() {
           <Field label="Bruttó összeg">{formatAmount(invoice.grossAmount, invoice.currency)}</Field>
           {invoice.unitPrice !== null && (
             <Field label="Egységár">
-              {invoice.unitPrice} {invoice.currency}/{invoice.unit}
+              {invoice.unitPrice} {invoice.currency}/{invoice.unit.name}
             </Field>
           )}
           {invoice.attachmentPath && (

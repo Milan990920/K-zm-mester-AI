@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
         }
       : undefined,
     orderBy: { name: "asc" },
-    include: { _count: { select: { sites: true, invoices: true } } },
+    include: { _count: { select: { consumptionSites: true, invoices: true } } },
   });
 
   return NextResponse.json(customers);

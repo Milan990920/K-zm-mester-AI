@@ -41,19 +41,22 @@ export async function POST(request: NextRequest) {
     ? await prisma.customer.findFirst({ where: { taxNumber: extracted.customerTaxNumber } })
     : null;
 
-  let matchedSiteId: string | null = null;
-  let matchedMeteringPointId: string | null = null;
+  let matchedConsumptionSiteId: string | null = null;
+  let matchedMeasurementPointId: string | null = null;
   let matchedEnergyTypeId: string | null = null;
 
   if (extracted.podCode) {
-    const meteringPoint = await prisma.meteringPoint.findFirst({
-      where: { podCode: extracted.podCode, ...(matchedCustomer ? { site: { customerId: matchedCustomer.id } } : {}) },
-      include: { site: true, energyType: true },
+    const measurementPoint = await prisma.measurementPoint.findFirst({
+      where: {
+        podCode: extracted.podCode,
+        ...(matchedCustomer ? { consumptionSite: { customerId: matchedCustomer.id } } : {}),
+      },
+      include: { consumptionSite: true, energyType: true },
     });
-    if (meteringPoint) {
-      matchedSiteId = meteringPoint.siteId;
-      matchedMeteringPointId = meteringPoint.id;
-      matchedEnergyTypeId = meteringPoint.energyTypeId;
+    if (measurementPoint) {
+      matchedConsumptionSiteId = measurementPoint.consumptionSiteId;
+      matchedMeasurementPointId = measurementPoint.id;
+      matchedEnergyTypeId = measurementPoint.energyTypeId;
     }
   }
 
@@ -62,11 +65,23 @@ export async function POST(request: NextRequest) {
     if (energyType) matchedEnergyTypeId = energyType.id;
   }
 
+  // Ha az energianem ismert és a PDF-ből felismertünk egy mértékegység-nevet,
+  // próbáljuk megtalálni a hozzá tartozó Unit-ot (az űrlap unitId-t vár, nem
+  // szabad szöveget).
+  let matchedUnitId: string | null = null;
+  if (matchedEnergyTypeId && extracted.unit) {
+    const unit = await prisma.unit.findFirst({
+      where: { energyTypeId: matchedEnergyTypeId, name: { equals: extracted.unit, mode: "insensitive" } },
+    });
+    matchedUnitId = unit?.id ?? null;
+  }
+
   return NextResponse.json({
     extracted,
     matchedCustomerId: matchedCustomer?.id ?? null,
-    matchedSiteId,
-    matchedMeteringPointId,
+    matchedConsumptionSiteId,
+    matchedMeasurementPointId,
     matchedEnergyTypeId,
+    matchedUnitId,
   });
 }

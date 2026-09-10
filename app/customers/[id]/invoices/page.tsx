@@ -16,7 +16,6 @@ interface InvoiceRow {
   periodStart: string;
   periodEnd: string;
   quantity: number;
-  unit: string;
   meterSerialNumber: string | null;
   netAmount: number;
   grossAmount: number;
@@ -25,9 +24,10 @@ interface InvoiceRow {
   attachmentPath: string | null;
   isDraft: boolean;
   customer: { name: string };
-  site: { name: string; address: string };
-  meteringPoint: { podCode: string };
+  consumptionSite: { name: string; address: string | null };
+  measurementPoint: { podCode: string };
   energyType: { code: string; name: string };
+  unit: { name: string };
 }
 
 function CopyableCode({ value }: { value: string }) {
@@ -164,11 +164,13 @@ function InvoiceListView() {
                     {invoice.isDraft && <span className="badge ml-2 bg-muted/10 text-muted">Piszkozat</span>}
                   </td>
                   <td className="px-4 py-3 text-ink">
-                    {invoice.site.name}
-                    <p className="text-xs text-muted">{invoice.site.address}</p>
+                    {invoice.consumptionSite.name}
+                    {invoice.consumptionSite.address && (
+                      <p className="text-xs text-muted">{invoice.consumptionSite.address}</p>
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <CopyableCode value={invoice.meteringPoint.podCode} />
+                    <CopyableCode value={invoice.measurementPoint.podCode} />
                   </td>
                   <td className="px-4 py-3">
                     {invoice.meterSerialNumber ? (
@@ -187,7 +189,7 @@ function InvoiceListView() {
                     {formatPeriod(new Date(invoice.periodStart), new Date(invoice.periodEnd))}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap font-mono text-[13px] text-ink">
-                    {formatQuantity(invoice.quantity, invoice.unit)}
+                    {formatQuantity(invoice.quantity, invoice.unit.name)}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap font-mono text-[13px]">
                     <span className="text-muted">{formatAmount(invoice.netAmount, invoice.currency)}</span>

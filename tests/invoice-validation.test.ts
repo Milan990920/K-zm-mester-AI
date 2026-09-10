@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { buildInvoiceSchema } from "@/lib/validations/invoice";
 
-const ELECTRICITY_UNITS = ["kWh", "MWh"];
+const ELECTRICITY_UNIT_IDS = ["unit-kwh", "unit-mwh"];
 
 const validFinal = {
   customerId: "c1",
-  siteId: "s1",
-  meteringPointId: "m1",
+  consumptionSiteId: "s1",
+  measurementPointId: "m1",
   energyTypeId: "e1",
   providerName: "MVM Next",
   invoiceNumber: "2026/001",
@@ -14,7 +14,7 @@ const validFinal = {
   periodStart: "2026-01-01",
   periodEnd: "2026-01-31",
   quantity: 1250,
-  unit: "kWh",
+  unitId: "unit-kwh",
   netAmount: 40000,
   vatRate: 27,
   vatAmount: 10800,
@@ -22,22 +22,22 @@ const validFinal = {
   invoiceType: "SETTLEMENT",
 };
 
-describe("buildInvoiceSchema — mértékegység szabály (SPEC.md 3.2, 4.3)", () => {
+describe("buildInvoiceSchema — mértékegység szabály", () => {
   it("elfogadja az energianemhez tartozó mértékegységet", () => {
-    const result = buildInvoiceSchema(ELECTRICITY_UNITS).safeParse(validFinal);
+    const result = buildInvoiceSchema(ELECTRICITY_UNIT_IDS).safeParse(validFinal);
     expect(result.success).toBe(true);
   });
 
-  it("elutasítja az energianemhez nem tartozó mértékegységet (pl. m³ villamos energiánál)", () => {
-    const result = buildInvoiceSchema(ELECTRICITY_UNITS).safeParse({ ...validFinal, unit: "m³" });
+  it("elutasítja az energianemhez nem tartozó mértékegységet (pl. m³-egység villamos energiánál)", () => {
+    const result = buildInvoiceSchema(ELECTRICITY_UNIT_IDS).safeParse({ ...validFinal, unitId: "unit-m3" });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.some((i) => i.path[0] === "unit")).toBe(true);
+      expect(result.error.issues.some((i) => i.path[0] === "unitId")).toBe(true);
     }
   });
 });
 
-describe("buildInvoiceSchema — időszak sorrend (SPEC.md 4.2)", () => {
+describe("buildInvoiceSchema — időszak sorrend", () => {
   it("elutasítja, ha a kezdő dátum nem korábbi a záró dátumnál", () => {
     const result = buildInvoiceSchema(null).safeParse({
       ...validFinal,
@@ -60,7 +60,7 @@ describe("buildInvoiceSchema — időszak sorrend (SPEC.md 4.2)", () => {
   });
 });
 
-describe("buildInvoiceSchema — kötelező mezők, kivéve piszkozatnál (SPEC.md 4.1)", () => {
+describe("buildInvoiceSchema — kötelező mezők, kivéve piszkozatnál", () => {
   it("piszkozatként elfogadja a hiányos számlát", () => {
     const result = buildInvoiceSchema(null).safeParse({ isDraft: true, providerName: "MVM Next" });
     expect(result.success).toBe(true);

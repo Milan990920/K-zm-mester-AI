@@ -11,8 +11,8 @@ export function formDataToInvoicePayload(formData: FormData): Record<string, unk
 
   return {
     customerId: get("customerId"),
-    siteId: get("siteId"),
-    meteringPointId: get("meteringPointId"),
+    consumptionSiteId: get("consumptionSiteId"),
+    measurementPointId: get("measurementPointId"),
     energyTypeId: get("energyTypeId"),
     providerName: get("providerName"),
     invoiceNumber: get("invoiceNumber"),
@@ -21,7 +21,7 @@ export function formDataToInvoicePayload(formData: FormData): Record<string, unk
     periodEnd: get("periodEnd"),
     dueDate: get("dueDate"),
     quantity: get("quantity"),
-    unit: get("unit"),
+    unitId: get("unitId"),
     meterSerialNumber: get("meterSerialNumber"),
     netAmount: get("netAmount"),
     vatRate: get("vatRate"),

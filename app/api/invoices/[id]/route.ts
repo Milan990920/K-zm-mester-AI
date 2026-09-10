@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
   const invoice = await prisma.invoice.findUnique({
     where: { id: params.id },
-    include: { customer: true, site: true, meteringPoint: true, energyType: true },
+    include: { customer: true, consumptionSite: true, measurementPoint: true, energyType: true, unit: true },
   });
   if (!invoice) {
     return NextResponse.json({ error: "A számla nem található." }, { status: 404 });

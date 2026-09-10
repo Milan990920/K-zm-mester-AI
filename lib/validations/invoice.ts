@@ -6,8 +6,8 @@ export const invoiceSourceValues = ["MANUAL", "PDF_UPLOAD"] as const;
 
 const invoiceShape = {
   customerId: z.string().trim().min(1).nullable().optional(),
-  siteId: z.string().trim().min(1).nullable().optional(),
-  meteringPointId: z.string().trim().min(1).nullable().optional(),
+  consumptionSiteId: z.string().trim().min(1).nullable().optional(),
+  measurementPointId: z.string().trim().min(1).nullable().optional(),
   energyTypeId: z.string().trim().min(1).nullable().optional(),
   providerName: z.string().trim().min(1).nullable().optional(),
   invoiceNumber: z.string().trim().min(1).nullable().optional(),
@@ -16,7 +16,7 @@ const invoiceShape = {
   periodEnd: z.coerce.date().nullable().optional(),
   dueDate: z.coerce.date().nullable().optional(),
   quantity: z.coerce.number().positive("A mennyiségnek pozitívnak kell lennie.").nullable().optional(),
-  unit: z.string().trim().min(1).nullable().optional(),
+  unitId: z.string().trim().min(1).nullable().optional(),
   meterSerialNumber: z.string().trim().nullable().optional(),
   netAmount: z.coerce.number().nullable().optional(),
   vatRate: z.coerce.number().min(0).nullable().optional(),
@@ -32,26 +32,25 @@ const invoiceShape = {
   isDraft: z.boolean().default(false),
 };
 
-// SPEC.md 4. pont, 1. szabály: ezek a mezők kötelezők, kivéve ha a számla
-// piszkozatként kerül mentésre.
+// Ezek a mezők kötelezők, kivéve ha a számla piszkozatként kerül mentésre.
 const REQUIRED_WHEN_FINAL = [
   "customerId",
-  "siteId",
-  "meteringPointId",
+  "consumptionSiteId",
+  "measurementPointId",
   "energyTypeId",
   "providerName",
   "quantity",
-  "unit",
+  "unitId",
   "grossAmount",
 ] as const;
 
 /**
- * `allowedUnits` a kiválasztott energyType.allowedUnits értéke — a
- * mennyiség/mértékegység pár csak eszerint kombinálható (SPEC.md 3.2, 4.3).
- * Null-t adj át, ha az energianem még nincs kiválasztva (pl. első renderkor);
- * ekkor a mértékegység-ellenőrzés kimarad, a többi szabály nem.
+ * `allowedUnitIds` a kiválasztott energyType-hoz tartozó Unit-ok id-jei —
+ * a mennyiség/mértékegység pár csak eszerint kombinálható. Null-t adj át, ha
+ * az energianem még nincs kiválasztva (pl. első renderkor); ekkor a
+ * mértékegység-ellenőrzés kimarad, a többi szabály nem.
  */
-export function buildInvoiceSchema(allowedUnits: string[] | null) {
+export function buildInvoiceSchema(allowedUnitIds: string[] | null) {
   return z.object(invoiceShape).superRefine((data, ctx) => {
     if (!data.isDraft) {
       for (const field of REQUIRED_WHEN_FINAL) {
@@ -72,8 +71,8 @@ export function buildInvoiceSchema(allowedUnits: string[] | null) {
       }
     }
 
-    // SPEC.md 4. pont, 2. szabály — akkor is érvényes, ha a számla piszkozat,
-    // hogy hibás dátumpár sose kerülhessen be még piszkozatként sem.
+    // Akkor is érvényes, ha a számla piszkozat, hogy hibás dátumpár sose
+    // kerülhessen be még piszkozatként sem.
     if (data.periodStart && data.periodEnd && data.periodStart >= data.periodEnd) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -82,12 +81,11 @@ export function buildInvoiceSchema(allowedUnits: string[] | null) {
       });
     }
 
-    // SPEC.md 3.2 / 4. pont, 3. szabály.
-    if (data.unit && allowedUnits && !allowedUnits.includes(data.unit)) {
+    if (data.unitId && allowedUnitIds && !allowedUnitIds.includes(data.unitId)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["unit"],
-        message: `A kiválasztott energianemhez csak ez a mértékegység adható meg: ${allowedUnits.join(", ")}.`,
+        path: ["unitId"],
+        message: "A kiválasztott mértékegység nem tartozik a kiválasztott energianemhez.",
       });
     }
   });

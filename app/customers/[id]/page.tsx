@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { energyBadgeClass } from "@/lib/energyBadge";
+import { MEASUREMENT_POINT_STATUS_LABELS, MEASUREMENT_TYPE_LABELS, SITE_CATEGORY_LABELS } from "@/lib/labels";
 
 function firstFieldError(errors: Record<string, string[]> | undefined): string | undefined {
   if (!errors) return undefined;
@@ -14,24 +15,25 @@ interface EnergyType {
   id: string;
   code: string;
   name: string;
-  allowedUnits: string[];
 }
 
-interface MeteringPoint {
+interface MeasurementPoint {
   id: string;
   podCode: string;
   providerName: string | null;
   networkOperatorName: string | null;
-  currentMeterSerial: string | null;
-  isActive: boolean;
+  meterSerialNumber: string | null;
+  measurementType: string;
+  status: string;
   energyType: EnergyType;
 }
 
-interface Site {
+interface ConsumptionSite {
   id: string;
   name: string;
-  address: string;
-  meteringPoints: MeteringPoint[];
+  address: string | null;
+  category: string;
+  measurementPoints: MeasurementPoint[];
 }
 
 interface CustomerDetail {
@@ -41,7 +43,12 @@ interface CustomerDetail {
   contactName: string | null;
   contactEmail: string | null;
   contactPhone: string | null;
-  sites: Site[];
+  specialistName: string | null;
+  specialistQualification: string | null;
+  certificateIssuer: string | null;
+  certificateNumber: string | null;
+  serviceCompanyName: string | null;
+  consumptionSites: ConsumptionSite[];
 }
 
 export default function CustomerDetailPage() {
@@ -72,6 +79,8 @@ export default function CustomerDetailPage() {
     );
   }
 
+  const hasSpecialistData = customer.specialistName || customer.serviceCompanyName;
+
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
       <Link href="/" className="link-quiet mb-8 inline-block text-sm text-muted">
@@ -90,6 +99,13 @@ export default function CustomerDetailPage() {
             {customer.contactEmail && <span>{customer.contactEmail}</span>}
             {customer.contactPhone && <span>{customer.contactPhone}</span>}
           </div>
+          {hasSpecialistData && (
+            <p className="mt-2 text-xs text-muted">
+              Szakreferens: <span className="text-ink">{customer.specialistName ?? "—"}</span>
+              {customer.specialistQualification && ` (${customer.specialistQualification})`}
+              {customer.serviceCompanyName && ` — ${customer.serviceCompanyName}`}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Link href={`/customers/${customer.id}/invoices`} className="btn-outline">
@@ -120,7 +136,7 @@ export default function CustomerDetailPage() {
         />
       )}
 
-      {customer.sites.length === 0 && !addingSite && (
+      {customer.consumptionSites.length === 0 && !addingSite && (
         <div className="empty-state">
           <p className="font-display text-base font-medium text-ink">
             Ehhez az ügyfélhez még nincs fogyasztási hely rögzítve
@@ -132,12 +148,15 @@ export default function CustomerDetailPage() {
       )}
 
       <div className="flex flex-col gap-4">
-        {customer.sites.map((site) => (
+        {customer.consumptionSites.map((site) => (
           <div key={site.id} className="surface p-5">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="font-display text-[15px] font-medium tracking-tight text-ink">{site.name}</p>
-                <p className="text-sm text-muted">{site.address}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-display text-[15px] font-medium tracking-tight text-ink">{site.name}</p>
+                  <span className="badge bg-muted/10 text-muted">{SITE_CATEGORY_LABELS[site.category]}</span>
+                </div>
+                {site.address && <p className="text-sm text-muted">{site.address}</p>}
               </div>
               <button
                 onClick={() => setAddingPodForSite((v) => (v === site.id ? null : site.id))}
@@ -148,8 +167,8 @@ export default function CustomerDetailPage() {
             </div>
 
             {addingPodForSite === site.id && (
-              <NewMeteringPointForm
-                siteId={site.id}
+              <NewMeasurementPointForm
+                consumptionSiteId={site.id}
                 energyTypes={energyTypes}
                 onDone={() => {
                   setAddingPodForSite(null);
@@ -158,22 +177,25 @@ export default function CustomerDetailPage() {
               />
             )}
 
-            {site.meteringPoints.length === 0 && addingPodForSite !== site.id && (
+            {site.measurementPoints.length === 0 && addingPodForSite !== site.id && (
               <p className="text-xs italic text-muted">Ehhez a fogyasztási helyhez még nincs mérési pont.</p>
             )}
 
-            {site.meteringPoints.length > 0 && (
+            {site.measurementPoints.length > 0 && (
               <ul className="flex flex-col divide-y divide-border">
-                {site.meteringPoints.map((mp) => (
+                {site.measurementPoints.map((mp) => (
                   <li key={mp.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                     <span className="font-mono text-[13px] text-ink">{mp.podCode}</span>
                     <span className={`badge ${energyBadgeClass(mp.energyType.code)}`}>
                       {mp.energyType.name}
                     </span>
+                    <span className="badge bg-muted/10 text-muted">{MEASUREMENT_TYPE_LABELS[mp.measurementType]}</span>
                     <span className="ml-auto text-xs text-muted">{mp.providerName ?? "—"}</span>
-                    {!mp.isActive && <span className="badge bg-muted/10 text-muted">Inaktív</span>}
+                    {mp.status === "INACTIVE" && (
+                      <span className="badge bg-muted/10 text-muted">{MEASUREMENT_POINT_STATUS_LABELS.INACTIVE}</span>
+                    )}
                     <Link
-                      href={`/invoices/new?customerId=${customer.id}&siteId=${site.id}&meteringPointId=${mp.id}`}
+                      href={`/invoices/new?customerId=${customer.id}&consumptionSiteId=${site.id}&measurementPointId=${mp.id}`}
                       className="text-xs font-semibold text-brass hover:underline"
                     >
                       + Számla
@@ -192,6 +214,7 @@ export default function CustomerDetailPage() {
 function NewSiteForm({ customerId, onDone }: { customerId: string; onDone: () => void }) {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
+  const [category, setCategory] = useState("BUILDING");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -200,10 +223,10 @@ function NewSiteForm({ customerId, onDone }: { customerId: string; onDone: () =>
     setIsSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/sites", {
+      const res = await fetch("/api/consumption-sites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId, name, address }),
+        body: JSON.stringify({ customerId, name, address, category }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -218,7 +241,7 @@ function NewSiteForm({ customerId, onDone }: { customerId: string; onDone: () =>
 
   return (
     <form onSubmit={handleSubmit} className="surface mb-4 flex flex-col gap-3 p-5">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <div>
           <label className="field-label">Megnevezés</label>
           <input value={name} onChange={(e) => setName(e.target.value)} className="field-input" />
@@ -226,6 +249,16 @@ function NewSiteForm({ customerId, onDone }: { customerId: string; onDone: () =>
         <div>
           <label className="field-label">Cím</label>
           <input value={address} onChange={(e) => setAddress(e.target.value)} className="field-input" />
+        </div>
+        <div>
+          <label className="field-label">Kategória</label>
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className="field-select">
+            {Object.entries(SITE_CATEGORY_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       {error && <p className="text-xs text-danger">{error}</p>}
@@ -236,18 +269,19 @@ function NewSiteForm({ customerId, onDone }: { customerId: string; onDone: () =>
   );
 }
 
-function NewMeteringPointForm({
-  siteId,
+function NewMeasurementPointForm({
+  consumptionSiteId,
   energyTypes,
   onDone,
 }: {
-  siteId: string;
+  consumptionSiteId: string;
   energyTypes: EnergyType[];
   onDone: () => void;
 }) {
   const [podCode, setPodCode] = useState("");
   const [energyTypeId, setEnergyTypeId] = useState("");
   const [providerName, setProviderName] = useState("");
+  const [measurementType, setMeasurementType] = useState("PROFILE");
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -258,10 +292,10 @@ function NewMeteringPointForm({
     setError(null);
     setWarning(null);
     try {
-      const res = await fetch("/api/metering-points", {
+      const res = await fetch("/api/measurement-points", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ siteId, podCode, energyTypeId, providerName }),
+        body: JSON.stringify({ consumptionSiteId, podCode, energyTypeId, providerName, measurementType }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -281,7 +315,7 @@ function NewMeteringPointForm({
 
   return (
     <form onSubmit={handleSubmit} className="mb-4 flex flex-col gap-3 rounded-lg border border-dashed border-border p-4">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-4 gap-3">
         <div>
           <label className="field-label">POD-kód</label>
           <input
@@ -301,6 +335,16 @@ function NewMeteringPointForm({
             {energyTypes.map((et) => (
               <option key={et.id} value={et.id}>
                 {et.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="field-label">Mérés típusa</label>
+          <select value={measurementType} onChange={(e) => setMeasurementType(e.target.value)} className="field-select">
+            {Object.entries(MEASUREMENT_TYPE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
               </option>
             ))}
           </select>
