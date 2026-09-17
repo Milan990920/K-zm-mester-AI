@@ -1,0 +1,27 @@
+{
+  "name": "Közmű Mester – Next.js + Postgres",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+
+  // Egyszeri lépések a konténer létrehozásakor: Postgres telepítése, szerepkör/
+  // adatbázis létrehozása, .env írása, függőségek telepítése, migráció + seed.
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  // Minden induláskor (edzsúsztatás/újraindítás után is): Postgres szolgáltatás
+  // felhúzása, mert az nem éli túl a konténer leállítását.
+  "postStartCommand": "bash .devcontainer/start-db.sh",
+
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Közmű Mester — alkalmazás",
+      "onAutoForward": "openPreview",
+      "visibility": "private"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["Prisma.prisma", "dbaeumer.vscode-eslint", "bradlc.vscode-tailwindcss"]
+    }
+  }
+}
